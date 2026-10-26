@@ -1,0 +1,109 @@
+/* EntradaDoApp: animação curta de abertura do app (o polvo e a marca) */
+
+.container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--canvas);
+  z-index: var(--intro-z);
+  cursor: pointer;
+  user-select: none;
+  opacity: 1;
+  transition: opacity var(--tempo-saida) var(--curva-saida);
+}
+
+.overlayFixed {
+  position: fixed;
+}
+
+.overlaySaindo {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.overlayConcluido {
+  display: none;
+  pointer-events: none;
+}
+
+.brandGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--intro-gap);
+  opacity: 1;
+  transform: none;
+}
+
+.brandGroupEntrando {
+  animation: introEntrada var(--tempo-pagina) var(--curva-entrada) both;
+}
+
+.mark {
+  width: var(--intro-mark-width);
+  height: var(--intro-mark-height);
+  filter: drop-shadow(0 0 var(--intro-glow-blur) var(--brand-glow));
+}
+
+.brandName {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.word {
+  width: var(--intro-word-width);
+  height: var(--intro-word-height);
+}
+
+.kana {
+  width: var(--intro-kana-width);
+  height: var(--intro-kana-height);
+  opacity: var(--brand-kana-opacity);
+}
+
+.texto {
+  font-family: var(--font-text);
+  font-size: var(--chip-font-size);
+  color: var(--text-muted);
+  margin-top: var(--space-8);
+}
+
+@keyframes introEntrada {
+  0% {
+    opacity: 0;
+    transform: translateY(var(--intro-rise)) scale(var(--escala-entrada));
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Escada de entrada dos blocos do app (70 ms entre seções) */
+.staggerItem {
+  animation: staggerFadeIn var(--tempo-pagina) var(--curva-entrada) both;
+  animation-delay: calc(var(--step, 0) * var(--tempo-intro-escada));
+}
+
+@keyframes staggerFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(var(--intro-rise));
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}

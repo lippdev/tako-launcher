@@ -1,0 +1,93 @@
+/* Medidas do OnboardingCapas (design/desktop/components/OnboardingCapas/README.md) */
+.root {
+  --onboarding-capas-gap: 18px;
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--onboarding-capas-gap);
+  width: 100%;
+}
+
+.title {
+  --onboarding-title-size: 40px;
+
+  font-family: var(--font-heading);
+  font-size: var(--onboarding-title-size);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  color: var(--text);
+  margin: 0;
+}
+
+.description {
+  --onboarding-desc-size: 15px;
+  --onboarding-desc-max-width: 520px;
+
+  font-family: var(--font-text);
+  font-size: var(--onboarding-desc-size);
+  line-height: 1.55;
+  color: var(--text-muted);
+  max-width: var(--onboarding-desc-max-width);
+  margin: 0;
+}
+
+.comparisonSection {
+  --onboarding-comparison-gap: 22px;
+
+  display: flex;
+  align-items: center;
+  gap: var(--onboarding-comparison-gap);
+  margin-bottom: var(--space-18);
+}
+
+.coverBefore,
+.coverAfter {
+  --cover-aspect-ratio: 3 / 4;
+  --onboarding-cover-width: 120px;
+  --onboarding-cover-height: 160px;
+
+  width: var(--onboarding-cover-width);
+  height: var(--onboarding-cover-height);
+  flex-shrink: 0;
+}
+
+.comparisonArrow {
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.comparisonNote {
+  --onboarding-comparison-note-size: 12.5px;
+  --onboarding-comparison-note-max-width: 180px;
+
+  font-family: var(--font-text);
+  font-size: var(--onboarding-comparison-note-size);
+  line-height: 1.4;
+  color: var(--text-muted);
+  max-width: var(--onboarding-comparison-note-max-width);
+}
+
+.actions {
+  --onboarding-actions-gap: 10px;
+  --onboarding-actions-margin-top: 8px;
+
+  display: flex;
+  align-items: center;
+  gap: var(--onboarding-actions-gap);
+  margin-top: var(--onboarding-actions-margin-top);
+}
+
+.footerNote {
+  --onboarding-footer-size: 12.5px;
+  --onboarding-footer-margin-top: 4px;
+
+  font-family: var(--font-text);
+  font-size: var(--onboarding-footer-size);
+  color: var(--text-dim);
+  margin: 0;
+  margin-top: var(--onboarding-footer-margin-top);
+}

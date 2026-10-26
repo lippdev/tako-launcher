@@ -1,0 +1,7 @@
+[platform.unix]
+cursor_wayland = "No Wayland, o Tako só consegue esconder o cursor sobre a própria janela. Sobre o jogo, depende do jogo."
+cursor_macos = "No macOS, o cursor pode voltar a aparecer quando outro app fica na frente."
+uinput_denied = "O Tako não tem permissão para criar o mouse virtual (/dev/uinput). Instale a regra udev do pacote (60-tako-uinput.rules) e entre de novo na sessão."
+accessibility_denied = "Para mover o cursor pelo controle, permita o Tako em Ajustes do Sistema > Privacidade e Segurança > Acessibilidade."
+builtin_display = "Tela integrada"
+display_n = "Tela {n}"

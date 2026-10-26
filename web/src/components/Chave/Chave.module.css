@@ -1,0 +1,45 @@
+.switch {
+  position: relative;
+  flex: none;
+  width: var(--switch-width);
+  height: var(--switch-height);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--control-track);
+  cursor: pointer;
+  transition: background-color var(--tempo-estado) var(--curva-estado);
+}
+
+/* Ligada: a cor de destaque (estado, README "Cor"). */
+.on {
+  background: var(--accent);
+}
+
+.switch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.thumb {
+  position: absolute;
+  top: var(--switch-inset);
+  left: var(--switch-inset);
+  width: var(--switch-thumb);
+  height: var(--switch-thumb);
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: var(--thumb-shadow);
+  transition: transform var(--tempo-estado) var(--curva-entrada);
+}
+
+/* Curso da bolinha: largura da chave menos a bolinha e as duas margens. */
+.on .thumb {
+  transform: translateX(calc(var(--switch-width) - var(--switch-thumb) - 2 * var(--switch-inset)));
+}
+
+/* Liquid Glass (protótipo, `.switch`): desligada em branco 14% com sombra por dentro. */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .switch:not(.on) {
+  background: var(--vidro-switch-off);
+  box-shadow: var(--vidro-switch-shadow);
+}

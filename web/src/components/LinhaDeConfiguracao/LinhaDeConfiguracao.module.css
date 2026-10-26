@@ -1,0 +1,101 @@
+.section {
+  margin: 0;
+}
+
+/* Título da seção ("MODO"): rótulo em caixa alta acima do grupo. */
+.heading {
+  margin: 0 0 var(--space-8) var(--space-4);
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.group {
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-card);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--setting-row-gap);
+  width: 100%;
+  min-height: var(--settings-row-height);
+  padding: var(--setting-row-padding);
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  transition: background-color var(--tempo-hover) var(--curva-estado);
+}
+
+.row + .row {
+  border-top: 1px solid var(--line);
+}
+
+.row:hover {
+  background: color-mix(in srgb, var(--text) 2%, transparent);
+}
+
+.link {
+  cursor: pointer;
+}
+
+.link:hover {
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+}
+
+/* O foco de uma linha clicável fica por dentro: o grupo corta (overflow) o anel que sai da borda. */
+.link:focus-visible {
+  outline-offset: calc(var(--focus-ring-width) * -1);
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.tag {
+  margin-left: var(--space-6);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.description {
+  display: block;
+  margin-top: 3px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.control {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.danger .title {
+  color: var(--error);
+}
+
+/* Liquid Glass (protótipo, `.set-group`): o grupo de linhas é vidro; as linhas dentro dele não. */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .group {
+  border-color: var(--vidro-group-edge);
+  background: var(--group);
+  box-shadow: var(--vidro-group-shadow);
+  backdrop-filter: var(--vidro-group-blur);
+}

@@ -1,0 +1,196 @@
+/* EditorDeEtiquetas (README do EtiquetasDoJogo): chips com ✕ de 24, o chip tracejado "+ Etiqueta" que vira campo e as
+   sugestões num menu junto ao campo. Os chips são os do EtiquetasDoJogo; aqui entram só o ✕, o campo e a lista.
+   Medidas do componente:
+   - --etq-icone-tirar: lado do ícone do ✕ (12px, README)
+   - --etq-campo-min: largura mínima do campo aberto (a do chip "+ Etiqueta" com folga)
+   - --etq-lista-largura: largura mínima da lista de sugestões (260px, README) */
+
+.raiz {
+  --etq-icone-tirar: 12px;
+  --etq-campo-min: 84px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+  min-width: 0;
+  padding-block: var(--space-6);
+}
+
+.raiz[data-alinhamento="fim"] {
+  justify-content: flex-end;
+}
+
+.chip {
+  composes: chip from "../EtiquetasDoJogo/EtiquetasDoJogo.module.css";
+  gap: var(--space-4);
+}
+
+.sm {
+  composes: sm from "../EtiquetasDoJogo/EtiquetasDoJogo.module.css";
+}
+
+.nome {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* O ✕ tem alvo de 24 e come o respiro à direita do chip (margem negativa), como na prévia. */
+.tirar {
+  composes: ring from "../../lib/focus.module.css";
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--space-24);
+  height: var(--space-24);
+  margin: 0 calc(-1 * var(--space-8)) 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background-color: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--tempo-foco) var(--curva-estado),
+    color var(--tempo-foco) var(--curva-estado);
+}
+
+.tirar:hover {
+  background-color: var(--glass-hover);
+  color: var(--text);
+}
+
+.tirar svg {
+  width: var(--etq-icone-tirar);
+  height: var(--etq-icone-tirar);
+}
+
+/* "+ Etiqueta": chip tracejado, em cinza até a mão chegar. */
+.adicionar {
+  gap: var(--space-6);
+  border-style: dashed;
+  color: var(--text-muted);
+}
+
+button.adicionar {
+  cursor: pointer;
+  margin: 0;
+  font-family: var(--font-text);
+}
+
+button.adicionar:hover {
+  color: var(--text);
+}
+
+.campo {
+  min-width: var(--etq-campo-min);
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  /* O chip pede a fonte do tema; o campo só segue o chip. */
+  line-height: inherit;
+}
+
+.campo:focus,
+.campo:focus-visible {
+  /* O foco do campo é o do chip (borda clara em `:focus-within`), não o contorno padrão do navegador. */
+  outline: none;
+}
+
+.campo::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+.adicionar:focus-within {
+  border-color: var(--focus-ring);
+  color: var(--text);
+}
+
+/* As sugestões: o mesmo vidro do MenuDeContexto, com a quantidade de jogos à direita. */
+.sugestoes {
+  /* A lista vive num portal, fora da `.raiz`: a medida é declarada aqui. */
+  --etq-lista-largura: 260px;
+  position: fixed;
+  z-index: 90;
+  left: 0;
+  top: 0;
+  min-width: var(--etq-lista-largura);
+  max-width: calc(var(--etq-lista-largura) * 1.5);
+  overflow-y: auto;
+  padding: var(--space-6);
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-float);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  animation: entrar var(--tempo-hover) var(--curva-entrada);
+}
+
+@keyframes entrar {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--space-4)));
+  }
+}
+
+.titulo {
+  padding: var(--space-8) 10px var(--space-6);
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.opcao {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: color-mix(in srgb, var(--text) 90%, transparent);
+  font-family: var(--font-text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.opcao[aria-selected="true"] {
+  background-color: var(--glass-hover);
+  color: var(--text);
+}
+
+.rotuloOpcao {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contagem {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.separador {
+  height: 0;
+  margin: 5px var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+/* Liquid Glass (protótipo, `.menu`, `.dl-pop`, `.drawer`, `.modal`, `.search-panel`): camada de vidro funda. */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .sugestoes {
+  border-color: var(--vidro-layer-edge);
+  background: var(--glass-panel-dense);
+  box-shadow: var(--vidro-layer-shadow);
+  backdrop-filter: var(--vidro-layer-blur);
+}

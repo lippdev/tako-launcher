@@ -1,0 +1,85 @@
+/* StatusDoJogo: chip no canto da página do jogo com ponto colorido e texto.
+   A cor nunca vem sozinha: sempre com o nome (README do StatusDoJogo).
+   Clicar abre o menu para alterar a situação. */
+
+.chip {
+  composes: ring from "../../lib/focus.module.css";
+  height: var(--chip-height);
+  padding: var(--chip-padding);
+  border-radius: var(--radius-control);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chip-gap);
+  font-family: var(--font-text);
+  font-size: var(--chip-font-size);
+  font-weight: 500;
+  line-height: 1;
+  background: var(--chip-bg);
+  border: 1px solid var(--line-strong);
+  backdrop-filter: blur(10px);
+  color: color-mix(in srgb, var(--text) 85%, transparent);
+  box-sizing: border-box;
+  white-space: nowrap;
+  user-select: none;
+  cursor: pointer;
+  margin: 0;
+  transition:
+    background var(--tempo-hover) var(--curva-estado),
+    color var(--tempo-hover) var(--curva-estado),
+    border-color var(--tempo-hover) var(--curva-estado),
+    transform var(--tempo-foco) var(--curva-entrada);
+}
+
+.chip:hover,
+.chip[data-force="hover"] {
+  background: var(--chip-bg-hover);
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--text) 25%, transparent);
+}
+
+.chip:active,
+.chip[data-force="pressed"] {
+  transform: scale(0.98);
+}
+
+.estatico {
+  cursor: default;
+}
+
+.estatico:hover {
+  background: var(--chip-bg);
+  color: color-mix(in srgb, var(--text) 85%, transparent);
+  border-color: var(--line-strong);
+}
+
+.chip svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+/* Ponto indicador de cor da situação (README: 8px de diâmetro) */
+.sdot {
+  width: var(--chip-dot-size);
+  height: var(--chip-dot-size);
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--status-none);
+  box-sizing: border-box;
+  flex: none;
+  transition:
+    background var(--tempo-estado) var(--curva-estado),
+    border var(--tempo-estado) var(--curva-estado);
+}
+
+.sdot.on {
+  border: 0;
+  background: var(--sc);
+}
+
+/* Liquid Glass (protótipo, `.badge-st` e `.chip`): controle de vidro. */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .chip {
+  border-color: var(--vidro-control-edge);
+  background: var(--glass-control);
+  box-shadow: var(--vidro-spec);
+  backdrop-filter: var(--vidro-control-blur);
+}

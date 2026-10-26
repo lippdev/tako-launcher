@@ -1,0 +1,257 @@
+/* `data-force="hover|focus"` no `input` só existe para a galeria mostrar o estado parado.
+   CampoDeBusca: medidas do README (design/desktop/components/CampoDeBusca) e do protótipo; cores do `tokens.css`.
+   O foco é do campo todo (`:focus-within`): o `input` não desenha anel próprio. */
+
+.field {
+  --busca-fundo: color-mix(in srgb, var(--text) 3.5%, transparent);
+  position: relative;
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+  font-family: var(--font-text);
+  font-weight: 500;
+  cursor: text;
+}
+
+/* O fundo e o contorno ficam num elemento à parte para poderem crescer por `transform`. */
+.box {
+  position: absolute;
+  inset: 0;
+  border: 1px solid transparent;
+  border-radius: inherit;
+  pointer-events: none;
+  transition:
+    background-color var(--tempo-hover) var(--curva-estado),
+    border-color var(--tempo-hover) var(--curva-estado),
+    box-shadow var(--tempo-estado) var(--curva-estado),
+    transform var(--tempo-entrada) var(--curva-entrada);
+}
+
+.field > :not(.box) {
+  position: relative;
+}
+
+.field svg {
+  flex: none;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  appearance: none;
+}
+
+/* O foco é do campo todo; vence o `:focus-visible` global do `base.css`. */
+.input:focus,
+.input:focus-visible {
+  outline: 0;
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+.input::-webkit-search-cancel-button,
+.input::-webkit-search-decoration {
+  display: none;
+}
+
+.hint {
+  flex: none;
+  padding: 1px var(--space-6);
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--keycap-bg);
+  color: var(--text-muted);
+  font-family: var(--font-text);
+  font-size: 12px;
+  white-space: nowrap;
+  transition: transform var(--tempo-entrada) var(--curva-entrada);
+}
+
+/* ---- Lista da biblioteca: 38, raio 10 ---- */
+
+.lista {
+  gap: 10px;
+  height: 38px;
+  padding: 0 var(--space-4) 0 13px;
+  border-radius: var(--radius-search, var(--radius-row));
+}
+
+/* TAKO: fundo branco 3,5%, sem borda; foco com anel da cor de destaque a 50% e brilho. */
+.lista .box {
+  background: var(--busca-fundo);
+}
+
+.lista:hover .box,
+.lista:has(.input[data-force="hover"]) .box {
+  background: color-mix(in srgb, var(--text) 5.5%, transparent);
+}
+
+.lista:focus-within .box,
+.lista:has(.input[data-force="focus"]) .box {
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent),
+    0 0 16px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+/* Fora do TAKO: fundo escuro com contorno; no foco o contorno clareia. */
+:global(:root[data-theme]:not([data-theme="tako"])) .lista .box {
+  border-color: var(--line-strong);
+  background: var(--surface);
+}
+
+:global(:root[data-theme]:not([data-theme="tako"])) .lista:focus-within .box,
+:global(:root[data-theme]:not([data-theme="tako"])) .lista:has(.input[data-force="focus"]) .box {
+  border-color: color-mix(in srgb, var(--text) 30%, transparent);
+  background: var(--surface);
+  box-shadow: none;
+}
+
+/* Liquid Glass: controle de vidro (protótipo, `.sb-search`). O `:not([data-glass="off"])` iguala a força das regras
+   "fora do TAKO" acima. */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .lista .box {
+  border-color: var(--vidro-control-edge);
+  background: var(--glass-control);
+  box-shadow: var(--vidro-spec);
+  backdrop-filter: var(--vidro-control-blur);
+}
+
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .lista:focus-within .box,
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .lista:has(.input[data-force="focus"]) .box {
+  border-color: color-mix(in srgb, var(--text) 30%, transparent);
+  background: var(--glass-control);
+  box-shadow: var(--vidro-spec);
+}
+
+.action {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-thumb);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--tempo-foco) var(--curva-estado),
+    color var(--tempo-foco) var(--curva-estado);
+}
+
+.action:hover,
+.action[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--text);
+}
+
+:global(:root[data-theme]:not([data-theme="tako"])) .action:hover,
+:global(:root[data-theme]:not([data-theme="tako"])) .action[aria-expanded="true"] {
+  background: var(--glass-hover);
+}
+
+.action:focus-visible {
+  background: var(--focus-fill);
+  box-shadow:
+    inset 0 0 0 1px var(--focus-ring),
+    0 0 0 var(--focus-ring-width) var(--focus-glow);
+  outline: none;
+  color: var(--text);
+}
+
+/* Ponto de destaque com um halo da cor do fundo; nasce por `scale`. */
+.indicator {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--surface);
+  transform: scale(0);
+  transition: transform var(--tempo-estado) var(--curva-entrada);
+}
+
+.active .indicator {
+  transform: scale(1);
+}
+
+/* ---- Loja: 300 × 40, pílula, cresce para 360 (1,2×) no foco ---- */
+
+.loja {
+  --busca-loja-largura: 300px;
+  --busca-loja-crescimento: 60px;
+  gap: 10px;
+  width: var(--busca-loja-largura);
+  height: 40px;
+  padding: 0 var(--space-8) 0 14px;
+  border-radius: var(--radius-full);
+}
+
+.loja .box {
+  border-color: var(--line-strong);
+  background: var(--surface-raised);
+  transform-origin: left center;
+}
+
+.loja:focus-within .box,
+.loja:has(.input[data-force="focus"]) .box {
+  border-color: color-mix(in srgb, var(--text) 30%, transparent);
+  /* 360 ÷ 300: o fundo cresce por `scaleX`, a largura de layout não muda (nada de animar `width`). */
+  transform: scaleX(1.2);
+}
+
+.loja:focus-within .hint,
+.loja:has(.input[data-force="focus"]) .hint {
+  transform: translateX(var(--busca-loja-crescimento));
+}
+
+/* ---- Busca geral: linha de 58 no topo do painel ---- */
+
+.geral {
+  gap: var(--space-12);
+  height: 58px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--line);
+  transition: border-color var(--tempo-hover) var(--curva-estado);
+}
+
+.geral:focus-within,
+.geral:has(.input[data-force="focus"]) {
+  border-bottom-color: color-mix(in srgb, var(--text) 30%, transparent);
+}
+
+.geral .input {
+  font-size: 15px;
+}
+/* Quantidade de filtros: emblema no canto do botão, no lugar do ponto. */
+.count {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--surface);
+  color: var(--on-primary);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 14px;
+  text-align: center;
+}

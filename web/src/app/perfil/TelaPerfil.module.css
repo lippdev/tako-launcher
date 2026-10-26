@@ -1,0 +1,128 @@
+/* A tela Perfil (README da TelaPerfil): margem lateral de 40, cabeçalho com avatar de 88, nome 30/800 e a linha de
+   estado; abas da loja e, embaixo, o conteúdo da guia. A vista rola por dentro e passa por baixo da barra de cima. */
+
+.pagina {
+  height: 100%;
+  padding: calc(var(--topbar-height) + var(--space-24)) var(--space-40) var(--space-48);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.cabeca {
+  display: flex;
+  align-items: center;
+  gap: var(--space-16);
+  margin-bottom: var(--space-24);
+}
+
+/* O anel é o da cor de destaque, como no botão de perfil da barra (BarraSuperior). */
+.avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  border-radius: var(--radius-full);
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--text) 16%, var(--tile)), var(--canvas));
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--accent) 75%, transparent),
+    0 0 0 5px color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--text);
+  font-family: var(--font-heading);
+  font-size: 34px;
+  font-weight: 800;
+}
+
+.identidade {
+  flex: 1;
+  min-width: 0;
+}
+
+.nome {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-heading);
+  font-size: 30px;
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Os pedaços da linha de estado, separados por um traço de 1 ("Perfil principal | Jogou por último ontem"). */
+.linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: var(--space-8) 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.linha > span + span {
+  margin-left: var(--space-12);
+  padding-left: var(--space-12);
+  border-left: 1px solid var(--line-strong);
+}
+
+.acoes {
+  display: flex;
+  flex: none;
+  gap: var(--space-12);
+}
+
+.painel {
+  margin-top: var(--space-24);
+}
+
+/* As barras da semana têm o nome do dia embaixo ("seg", "hoje"), mais largo que a barra de 10: o passo entre elas
+   cresce para os nomes não se tocarem. */
+.semana {
+  --bar-gap: 20px;
+}
+
+/* Uma seção da Visão geral: título e, à direita, a ação ("Ver todas"). */
+.secao {
+  margin-top: var(--space-40);
+}
+
+.secaoCabeca {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  margin-bottom: var(--space-12);
+}
+
+.secaoTitulo {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 19px;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.aviso {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  margin: 0;
+  padding: var(--space-24) 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.retry {
+  padding: var(--space-4) var(--space-12);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  background: var(--tile);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.retry:hover {
+  background: var(--glass-hover);
+}

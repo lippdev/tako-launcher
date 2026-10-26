@@ -1,0 +1,105 @@
+/* Véu: 50% com desfoque 3, aparece em 300 ms (README PainelEAviso). Só opacity. */
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-scrim);
+  background: var(--scrim);
+  backdrop-filter: blur(var(--scrim-blur));
+  opacity: 0;
+  transition: opacity 300ms var(--curva-estado);
+}
+
+/* Painel: desliza de 102% para 0 em 450 ms na curva de entrada. Só transform. */
+.panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-layer);
+  display: flex;
+  flex-direction: column;
+  width: var(--drawer-width);
+  max-width: 100%;
+  background: var(--surface-raised);
+  border-left: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-drawer);
+  transform: translateX(102%);
+  transition: transform var(--tempo-pagina) var(--curva-entrada);
+}
+
+.wide {
+  width: var(--drawer-width-wide);
+}
+
+.panel:focus {
+  outline: none;
+}
+
+.scrim.show {
+  opacity: 1;
+}
+
+.panel.show {
+  transform: none;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.count {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--tempo-hover) var(--curva-estado),
+    color var(--tempo-hover) var(--curva-estado);
+}
+
+.close:hover {
+  background: var(--glass-hover);
+  color: var(--text);
+}
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.foot {
+  padding: 16px 18px 18px;
+  border-top: 1px solid var(--line);
+}
+
+/* Liquid Glass (protótipo, `.menu`, `.dl-pop`, `.drawer`, `.modal`, `.search-panel`): camada de vidro funda. */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .panel {
+  border-color: var(--vidro-layer-edge);
+  background: var(--glass-panel-dense);
+  box-shadow: var(--vidro-layer-shadow);
+  backdrop-filter: var(--vidro-layer-blur);
+}

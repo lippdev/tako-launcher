@@ -1,0 +1,100 @@
+/* README da CategoriaDeConfiguracao: 44 de altura, raio 10, ícone de 15 num quadrado de 28 (raio 7); hover branco 5%;
+   atual com fundo branco 9%, contorno 8% e o quadrado do ícone branco com o ícone escuro. */
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  width: 100%;
+  height: 44px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-row);
+  background: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--tempo-hover) var(--curva-estado),
+    border-color var(--tempo-hover) var(--curva-estado),
+    color var(--tempo-hover) var(--curva-estado);
+}
+
+.item + .item {
+  margin-top: 2px;
+}
+
+.item:hover {
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  color: var(--text);
+}
+
+.current,
+.current:hover {
+  background: color-mix(in srgb, var(--text) 9%, transparent);
+  border-color: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--text);
+}
+
+/* O anel de foco fica por dentro: a lista rola e corta o que sai da borda. */
+.item:focus-visible {
+  outline-offset: calc(var(--focus-ring-width) * -1);
+}
+
+.icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-thumb);
+  background: var(--settings-control);
+  transition:
+    background-color var(--tempo-hover) var(--curva-estado),
+    color var(--tempo-hover) var(--curva-estado);
+}
+
+.current .icon {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Contagem: cor de destaque, só quando algo pede atenção. */
+.count {
+  display: grid;
+  flex: none;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Liquid Glass (protótipo, `.set-item` e `.sic`): escolhida como o vidro escolhido; ícone em branco 8%. */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .item:hover {
+  background: var(--vidro-row-hover);
+}
+
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .current,
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .current:hover {
+  border-color: var(--vidro-selected-edge);
+  background: var(--glass-selected);
+  box-shadow: var(--vidro-selected-spec);
+}
+
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .item:not(.current) .icon {
+  background: var(--vidro-icon-bg);
+}

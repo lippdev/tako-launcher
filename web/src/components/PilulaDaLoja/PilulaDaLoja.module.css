@@ -1,0 +1,72 @@
+/* PilulaDaLoja: chip de 32, raio 9, fundo escuro translúcido com desfoque de 10px.
+   Usado no canto superior da página do jogo para sistema e ações. */
+
+.chip {
+  composes: ring from "../../lib/focus.module.css";
+  height: var(--chip-height);
+  padding: var(--chip-padding);
+  border-radius: var(--radius-control);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chip-gap);
+  font-family: var(--font-text);
+  font-size: var(--chip-font-size);
+  font-weight: 500;
+  line-height: 1;
+  background: var(--chip-bg);
+  border: 1px solid var(--line-strong);
+  backdrop-filter: blur(10px);
+  color: color-mix(in srgb, var(--text) 85%, transparent);
+  box-sizing: border-box;
+  white-space: nowrap;
+  user-select: none;
+  transition:
+    background var(--tempo-hover) var(--curva-estado),
+    color var(--tempo-hover) var(--curva-estado),
+    border-color var(--tempo-hover) var(--curva-estado),
+    transform var(--tempo-foco) var(--curva-entrada);
+}
+
+.chip svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+/* Quando vira botão interativo */
+button.chip {
+  cursor: pointer;
+  margin: 0;
+}
+
+button.chip:hover,
+button.chip[data-force="hover"] {
+  background: var(--chip-bg-hover);
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--text) 25%, transparent);
+}
+
+button.chip:active,
+button.chip[data-force="pressed"] {
+  transform: scale(0.98);
+}
+
+button.chip:disabled {
+  opacity: var(--disabled-opacity);
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Estado ativo ou ligado (ex.: "Link copiado") */
+.ativo {
+  border-color: color-mix(in srgb, var(--success) 45%, transparent);
+  color: var(--success);
+}
+
+/* Liquid Glass (protótipo, `.badge-st` e `.chip`): controle de vidro. */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .chip {
+  border-color: var(--vidro-control-edge);
+  background: var(--glass-control);
+  box-shadow: var(--vidro-spec);
+  backdrop-filter: var(--vidro-control-blur);
+}

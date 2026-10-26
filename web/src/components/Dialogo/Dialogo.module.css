@@ -1,0 +1,128 @@
+/* Dialogo: medidas do README (design/desktop/components/Dialogo, PadraoPopup, TrocaDePopup). */
+
+.veil {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  background: var(--veil);
+  backdrop-filter: blur(var(--veil-blur));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--tempo-estado) var(--curva-estado);
+}
+
+.veil[data-visible="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.box {
+  --dialogo-largura: 480px;
+  --dialogo-subida: 12px;
+  width: min(var(--dialogo-largura), calc(100% - 2 * var(--space-24)));
+  max-height: 88%;
+  overflow-y: auto;
+  padding: 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-hero);
+  background: var(--surface-raised);
+  color: var(--text);
+  box-shadow: var(--shadow-layer);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  outline: none;
+  /* Entra subindo 12 com escala 0,98; sai pelo mesmo caminho. */
+  transform: translateY(var(--dialogo-subida)) scale(var(--escala-entrada));
+  transition: transform var(--tempo-entrada) var(--curva-entrada);
+}
+
+.veil[data-visible="true"] .box {
+  transform: none;
+}
+
+/* `will-change` só enquanto anima (GPU durante a transição, normal depois). */
+.veil[data-animating="true"] .box {
+  will-change: transform;
+}
+
+.s {
+  --dialogo-largura: 440px;
+}
+
+.m {
+  --dialogo-largura: 540px;
+}
+
+.l {
+  --dialogo-largura: 680px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  margin-bottom: var(--space-16);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.close {
+  composes: ring from "../../lib/focus.module.css";
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background-color: transparent;
+  color: color-mix(in srgb, var(--text) 70%, transparent);
+  cursor: pointer;
+  transition:
+    background-color var(--tempo-hover) var(--curva-estado),
+    color var(--tempo-hover) var(--curva-estado);
+}
+
+.close:hover {
+  background-color: var(--glass-hover);
+  color: var(--text);
+}
+
+.content {
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.fine {
+  margin: var(--space-12) 0 0;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* Liquid Glass (protótipo, `.menu`, `.dl-pop`, `.drawer`, `.modal`, `.search-panel`): camada de vidro funda. */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .box {
+  border-color: var(--vidro-layer-edge);
+  background: var(--glass-panel-dense);
+  box-shadow: var(--vidro-layer-shadow);
+  backdrop-filter: var(--vidro-layer-blur);
+}

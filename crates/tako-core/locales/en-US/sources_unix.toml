@@ -1,0 +1,6 @@
+[sources_unix]
+heroic_missing = "Heroic Games Launcher not found on this computer"
+lutris_missing = "Lutris not found on this computer"
+bottles_missing = "Bottles not found on this computer"
+itch_missing = "itch.io not found on this computer"
+itch_fallback = "itch game {id}"

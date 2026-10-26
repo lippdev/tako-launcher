@@ -1,0 +1,316 @@
+/* BotaoDesktop: medidas do README (design/desktop/components/BotaoDesktop) e cores do `tokens.css`.
+   `data-force="hover|pressed|focus"` só existe para a galeria mostrar o estado parado. */
+
+.btn {
+  composes: ring from "../../lib/focus.module.css";
+  --botao-chip: 36px;
+  --botao-chip-radius: var(--radius-chip, 8px);
+  --botao-chip-icon: 17px;
+  --botao-ring: var(--focus-glow);
+  --botao-ring-hover: var(--glass-pressed);
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  margin: 0;
+  border: 1px solid var(--line-strong);
+  background: var(--glass-control);
+  color: var(--text);
+  font-family: var(--font-text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  backdrop-filter: blur(var(--glass-item-blur));
+  transition:
+    transform var(--tempo-foco) var(--curva-entrada),
+    box-shadow var(--tempo-estado) var(--curva-estado),
+    color var(--tempo-hover) var(--curva-estado),
+    border-color var(--tempo-hover) var(--curva-estado);
+}
+
+/* Hover: uma camada que clareia, só com `opacity` (animar `background` repinta). */
+.btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  /* O clareado segue o formato do botão (pílula, raio 11 ou 9); sem isso os cantos saíam da pílula. */
+  border-radius: inherit;
+  z-index: -1;
+  background: var(--glass-hover);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--tempo-hover) var(--curva-estado);
+}
+
+.btn:hover::before,
+.btn[data-force="hover"]::before {
+  opacity: 1;
+}
+
+.btn:active,
+.btn[data-force="pressed"] {
+  transform: scale(var(--escala-pressionado));
+}
+
+.btn:disabled {
+  opacity: var(--disabled-opacity);
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn:disabled::before {
+  opacity: 0;
+}
+
+.btn svg {
+  flex: none;
+}
+
+.full {
+  width: 100%;
+}
+
+/* ---- Primário e secundário: 46, raio 11, texto à esquerda e chip de 36 à direita ---- */
+
+.action {
+  height: var(--primary-height);
+  padding: 0 5px 0 18px;
+  gap: 20px;
+  border-radius: var(--radius-button);
+}
+
+.noChip {
+  padding-right: 18px;
+}
+
+.text {
+  text-align: left;
+}
+
+/* Largura mínima de 112 só no primário (README); o secundário tem a largura do texto. */
+.primary .text {
+  min-width: 112px;
+}
+
+.sm {
+  height: 38px;
+  padding-left: 14px;
+  gap: 14px;
+  font-size: 13px;
+  border-radius: var(--radius-control);
+  --botao-chip: 30px;
+  --botao-chip-radius: var(--radius-thumb);
+}
+
+.sm .text {
+  min-width: 0;
+}
+
+.iconChip {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--botao-chip);
+  height: var(--botao-chip);
+  border-radius: var(--botao-chip-radius);
+}
+
+.iconChip svg {
+  width: var(--botao-chip-icon);
+  height: var(--botao-chip-icon);
+}
+
+.primary {
+  background: var(--primary);
+  border-color: var(--primary-hover);
+  color: var(--on-primary);
+  font-family: var(--font-heading);
+  box-shadow: 0 0 0 3px var(--botao-ring);
+  backdrop-filter: none;
+}
+
+.primary::before {
+  background: var(--primary-hover);
+}
+
+.primary:hover,
+.primary[data-force="hover"] {
+  box-shadow:
+    0 0 0 var(--space-4) var(--botao-ring-hover),
+    0 10px 34px var(--botao-ring-hover);
+}
+
+.primary .iconChip {
+  background: var(--primary-chip);
+  color: var(--text);
+}
+
+/* O foco do primário não pode sumir sobre o fundo claro: contorno e brilho, sem o clareado. */
+.action.primary:focus-visible,
+.action.primary[data-force="focus"] {
+  background-image: none;
+  box-shadow:
+    0 0 0 1px var(--primary-chip),
+    0 0 0 var(--focus-ring-width) var(--focus-ring),
+    0 0 0 calc(var(--focus-ring-width) + 3px) var(--botao-ring);
+}
+
+/* Primário de estado (Atualizar): cor de destaque, texto claro. */
+.state {
+  background: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--text));
+  color: var(--on-accent);
+  /* A cor de destaque vem da arte do jogo (clara ou escura): o texto acompanha o contraste. */
+  color: contrast-color(var(--accent));
+}
+
+.state::before {
+  background: var(--glass-hover);
+}
+
+.state .iconChip {
+  background: color-mix(in srgb, currentColor 20%, transparent);
+  color: inherit;
+}
+
+/* Baixando: barra de 3 no pé, da cor de destaque; cresce por `scaleX`. */
+.bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 3px;
+  background: var(--accent);
+  transform-origin: left;
+  transition: transform var(--tempo-hover) linear;
+}
+
+.secondary .iconChip {
+  border: 1px solid var(--line-strong);
+}
+
+.secondary.on {
+  border-color: color-mix(in srgb, var(--success) 35%, transparent);
+}
+
+.secondary.on .iconChip {
+  color: var(--success);
+}
+
+/* ---- Quadrado: 46×46, raio 11, só ícone ---- */
+
+.square {
+  display: grid;
+  place-items: center;
+  /* O `.btn` usa `space-between`: numa grade de uma coluna isso empurrava o ícone para a esquerda. */
+  justify-content: center;
+  width: var(--primary-height);
+  height: var(--primary-height);
+  padding: 0;
+  border-radius: var(--radius-button);
+}
+
+.square:active,
+.square[data-force="pressed"] {
+  transform: scale(0.95);
+}
+
+.on-warning {
+  color: var(--warning);
+}
+
+.on-wish {
+  color: var(--wish);
+}
+
+/* ---- Contornado (36, raio 9) e chip (32, raio 9) ---- */
+
+.outlined,
+.chip {
+  gap: var(--space-8);
+  padding: 0 var(--space-12);
+  border-radius: var(--radius-control);
+}
+
+.outlined {
+  height: var(--control-height);
+  background: var(--settings-control);
+  font-size: 13px;
+}
+
+.outlined.on {
+  border-color: color-mix(in srgb, var(--success) 35%, transparent);
+  color: var(--success);
+}
+
+.chip {
+  height: 32px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--text) 85%, transparent);
+}
+
+.chip:hover,
+.chip[data-force="hover"] {
+  color: var(--text);
+}
+
+.chip svg {
+  width: 14px;
+  height: 14px;
+}
+
+.dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+}
+
+.dot-success {
+  background: var(--success);
+}
+
+.dot-accent {
+  background: var(--accent);
+}
+
+/* ---- Liquid Glass (protótipo, `.tk.theme-glass .btn`) ---- */
+
+/* Secundário, quadrado e contornado: vidro (10%, contorno 16%, desfoque e reflexo); hover a 17%. */
+:global(:root[data-theme="vidro"]) .btn:not(.primary):not(.state) {
+  border-color: var(--vidro-control-edge);
+  background: var(--glass-control);
+  box-shadow: var(--vidro-spec);
+  backdrop-filter: var(--vidro-control-blur);
+}
+
+:global(:root[data-theme="vidro"]) .btn:not(.primary):not(.state)::before {
+  background: var(--vidro-control-hover);
+}
+
+:global(:root[data-theme="vidro"]) .secondary .iconChip {
+  border-color: var(--vidro-chip-edge);
+}
+
+/* Primário: degradê branco com reflexo e brilho; o chip fica preto. */
+:global(:root[data-theme="vidro"]) .primary {
+  border-color: var(--vidro-primary-edge);
+  background: var(--vidro-primary);
+  box-shadow: var(--vidro-primary-shadow);
+  backdrop-filter: var(--vidro-control-blur);
+}
+
+:global(:root[data-theme="vidro"]) .primary .iconChip {
+  background: var(--vidro-primary-chip);
+}
+
+/* Controles em pílula: o texto começa a 20, como no protótipo (`.glass-pills .btn`). */
+:global(:root[data-theme="vidro"][data-pills="true"]) .action {
+  padding-left: 20px;
+}

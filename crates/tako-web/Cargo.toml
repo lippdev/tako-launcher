@@ -1,0 +1,32 @@
+[package]
+name = "tako-web"
+description = "Hospedeiro da interface web do Tako (WEB-02): ponte React ↔ tako-app e esquemas tako-app:// e tako-img://."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+tako-app.workspace = true
+tako-core.workspace = true
+tako-platform.workspace = true
+image.workspace = true
+rfd.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+cef = { workspace = true, optional = true }
+
+[features]
+# O hospedeiro CEF (Windows). Sem ela o crate só tem a ponte e os esquemas, e `cargo test --workspace`
+# não baixa nem compila o Chromium. O `tako --features web` liga esta.
+# Liga também os controles pelo SDL3 no núcleo (`tako-platform/gamepad`, WEB-05b).
+cef = ["dep:cef", "tako-platform/gamepad"]
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

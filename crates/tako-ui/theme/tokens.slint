@@ -1,0 +1,366 @@
+// Tokens do tema padrão (DESIGN.md). Palco de 1080 unidades de altura: `Ui.u` é uma unidade em px lógicos.
+
+export global Ui {
+    // Unidade do palco; o App atualiza quando a janela muda de tamanho.
+    in-out property <length> u: 1px;
+    // Cor do jogo em foco e a versão escura (calculadas pelo Tako, AccentPalette).
+    in-out property <color> accent: #2B3A55;
+    in-out property <color> accent-deep: #161E2C;
+    in property <bool> reduce-motion: false;
+    in property <float> text-scale: 1;
+    // "xbox", "playstation", "nintendo" ou "keyboard": muda os glifos das dicas.
+    in property <string> input-kind: "xbox";
+    // O foco mais recente veio do mouse passando por cima: destaca o item, mas listas e fileiras não rolam até ele.
+    in property <bool> pointer: false;
+
+    in-out property <color> canvas: #0E1116;
+    in-out property <color> on-accent: #FFFFFF;
+    in-out property <color> on-accent-muted: #FFFFFFB8;
+    in-out property <color> on-accent-subtle: #FFFFFF80;
+    in-out property <color> surface-1: #FFFFFF1F;
+    in-out property <color> surface-2: #FFFFFF33;
+    in-out property <color> surface-sidebar: #FFFFFF2E;
+    in-out property <color> surface-solid: #FFFFFF;
+    in-out property <color> on-surface-solid: #11141A;
+    in-out property <color> on-surface-solid-muted: #565C68;
+    in-out property <color> control-track-off: #FFFFFF40;
+    in-out property <color> control-off: #FFFFFF8C;
+    in-out property <color> control-on-on-solid: #0B7A3B;
+    in-out property <color> control-off-on-solid: #5B6170;
+    in-out property <color> control-track-on-solid: #11141A33;
+    in-out property <color> value-pill-on-solid: #11141A1A;
+    in-out property <color> scrim: #00000099;
+    in-out property <color> success: #3DDC84;
+    in-out property <color> warning: #FFB020;
+    in-out property <color> error: #FF5A5F;
+
+    out property <duration> focus-time: reduce-motion ? 0ms : 160ms;
+    out property <duration> page-time: reduce-motion ? 0ms : 280ms;
+    out property <duration> color-time: reduce-motion ? 0ms : 600ms;
+    // "Abrindo…" sumindo para o jogo; o app espera o mesmo tempo (`app::leave_fade`).
+    out property <duration> leave-time: reduce-motion ? 0ms : 450ms;
+
+    // Tipografia (px do palco).
+    out property <length> display: 84 * u * text-scale;
+    out property <length> headline-lg: 64 * u * text-scale;
+    out property <length> headline-md: 38 * u * text-scale;
+    out property <length> title-md: 26 * u * text-scale;
+    out property <length> body-lg: 26 * u * text-scale;
+    out property <length> body-md: 22 * u * text-scale;
+    out property <length> label-lg: 24 * u * text-scale;
+    out property <length> label-md: 20 * u * text-scale;
+    out property <length> label-sm: 18 * u * text-scale;
+
+    in-out property <string> font-title: "Source Sans 3";
+    in-out property <string> font-text: "Inter";
+
+    out property <length> safe-x: 72 * u;
+    out property <length> safe-y: 48 * u;
+    out property <length> hint-bar: 88 * u;
+    out property <length> radius-sm: 8 * u;
+    out property <length> radius-md: 14 * u;
+    out property <length> radius-lg: 22 * u;
+
+    // Textos que o tema mostra por conta própria (o resto vem pronto do Tako).
+    in property <string> text-search: "Buscar jogos";
+
+    // ── Modo desktop (Tako Design System — Desktop, rebranding out/2026). Fora da API de tema: só `desktop.slint` usa.
+    // A tela cheia mantém os nomes e os valores dela (canvas, on-accent*, warning, error): o desktop lê `desk-*`.
+    // Tema do desktop: 0 TAKO, 1 Escuro, 2 Meia-noite, 3 Preto OLED, 4 Liquid Glass. Cada cor abaixo é a lista das
+    // colunas do tokens.json nessa ordem + a sólida (5), que o Liquid Glass usa com "Reduzir transparência".
+    in property <int> desk-theme: 0;
+    in property <bool> reduce-transparency: false;
+    // Opções do Liquid Glass: opacidade das superfícies (2–20%), controles em pílula e a arte como luz ambiente
+    // (desligada, a luz e o fundo do vidro usam a cor de destaque). O desfoque (12–60) fica para a etapa de camadas.
+    in property <float> glass-opacity: 0.07;
+    in property <bool> glass-pill: true;
+    in property <bool> glass-ambient: true;
+    out property <int> desk-variant: (desk-theme == 4 && reduce-transparency) ? 5 : desk-theme;
+
+    in-out property <color> desk-canvas: [#0b0b0e, #0a0a0a, #0b0e15, #000000, #07080c, #07080c][desk-variant];
+    out property <color> titlebar: [#08080b, #070707, #070707, #070707, #080a0e52, #080a0e][desk-variant];
+    out property <color> titlebar-tint: #121019;
+    // BarraSuperior: no TAKO a barra é fosca (tinta violeta → canvas) e fica sempre nas cores do logo, mesmo com as
+    // cores da arte ligadas; nos outros temas, o destaque escolhido. O desktop pinta a lente por baixo.
+    out property <color> bar-accent: desk-theme == 0 ? #d8c8bc : desk-accent;
+    out property <color> bar-on-accent: desk-theme == 0 ? #14110f : desk-on-accent;
+    out property <color> bar-line: desk-theme == 0 ? #ffffff0f : line;
+    out property <brush> titlebar-wash: desk-theme == 0
+        ? @linear-gradient(90deg, titlebar-tint.with-alpha(0.75) 0%, desk-canvas.with-alpha(0.52) 45%)
+        : titlebar;
+    out property <color> surface: [#0d0d10, #0c0c0c, #0c0c0c, #0c0c0c, Colors.white.with-alpha(glass-opacity), #141519][desk-variant];
+    out property <color> surface-raised: [#121317, #121212, #121212, #121212, #14161c94, #18191d][desk-variant];
+    out property <color> tile: [#141519, #141414, #141414, #141414, #ffffff0d, #141519][desk-variant];
+    out property <color> tile-foot: [#101014, #0f0f0f, #0f0f0f, #0f0f0f, #00000029, #101014][desk-variant];
+    out property <color> group: [#0e0c14db, #0c0c0cdb, #0c0c0cdb, #0c0c0cdb, Colors.white.with-alpha(glass-opacity), #141519][desk-variant];
+    out property <color> line: [#e1deff13, #ffffff12, #ffffff12, #ffffff12, #ffffff14, #ffffff14][desk-variant];
+    out property <color> line-strong: [#e1deff21, #ffffff1f, #ffffff1f, #ffffff1f, #ffffff26, #ffffff26][desk-variant];
+    out property <color> desk-text: [#f4f1f0, #f2f2f2, #f2f2f2, #f2f2f2, #f2f2f2, #f2f2f2][desk-variant];
+    out property <color> desk-text-muted: [#958f94, #8a8a8a, #8a8a8a, #8a8a8a, #a5a9b3, #a5a9b3][desk-variant];
+    out property <color> desk-text-dim: [#625d63, #5a5a5a, #5a5a5a, #5a5a5a, #8a8f9a, #8a8f9a][desk-variant];
+    // Cor de destaque do desktop (a escolhida, ou a da arte do jogo no TAKO). O global não anima: quem pinta com
+    // ela desliza em `tempo-cor`.
+    in-out property <color> desk-accent: #d8c8bc;
+    // Brilhos de canto da janela: a cor de destaque a 7% (cima à esquerda) e 4% (baixo à direita).
+    out property <color> ambient-1: desk-accent.with-alpha(0.07);
+    out property <color> ambient-2: desk-accent.with-alpha(0.04);
+    // Texto sobre o destaque: escuro (#14110f) quando ele é claro (luminância > 0,6), branco nos outros (o Tako decide).
+    in-out property <color> desk-on-accent: #ffffff;
+    out property <color> desk-warning: #ffcf4d;
+    out property <color> desk-error: #ff7b7b;
+    out property <color> wish: #ff5d7a;
+    out property <color> metacritic-good: #00ce7a;
+    out property <color> metacritic-mixed: #ffbd3f;
+    out property <color> metacritic-bad: #ff6874;
+    out property <color> brand-glow: #beb4ff2e;
+    out property <color> primary: #f4f4f4;
+    out property <color> primary-chip: #0d0d0d;
+    out property <color> on-primary: #111216;
+
+    // Aviso (toast, PainelEAviso): fundo claro (#f6efed no tema TAKO, #f4f4f4 nos outros), texto escuro.
+    out property <color> toast-bg: desk-theme == 0 ? #f6efed : #f4f4f4;
+    out property <color> toast-text: #111111;
+
+    // Apelidos dos nomes antigos, com os valores novos.
+    out property <color> settings-bg: [#0b0b0e, #0a0a0a, #0a0a0a, #0a0a0a, #07080c, #07080c][desk-variant];
+    out property <color> settings-surface: surface;
+    out property <color> settings-separator: line;
+    out property <color> settings-control: tile;
+    out property <color> settings-control-hover: #1c1c22;
+    out property <color> art-scrim-left: #08080899;
+    out property <color> art-scrim-bottom: #080808eb;
+    out property <color> art-scrim-strong: #0b0b0ef0;
+    // Etiqueta sobre a arte (a situação do jogo): preto a 60%.
+    out property <color> chip-scrim: #00000099;
+    // Cartão do trailer: véu sobre a miniatura (40%), disco do ▶ (55%, 75% no hover) e o ▶ em branco.
+    out property <color> media-veil: #00000066;
+    out property <color> media-play: #0000008c;
+    out property <color> media-play-hover: #000000bf;
+    out property <color> media-on: #ffffff;
+    out property <float> custom-background-opacity: 0.55;
+    out property <color> custom-background-scrim: #00000080;
+    out property <color> glass-panel: surface;
+    out property <color> glass-panel-dense: surface-raised;
+    // Reflexos só no Liquid Glass.
+    out property <color> glass-highlight: desk-variant == 4 ? #ffffff24 : #ffffff00;
+    out property <color> glass-specular: desk-variant == 4 ? #ffffff24 : #ffffff00;
+    out property <color> glass-edge: desk-theme == 4 ? #ffffff21 : line-strong;
+    out property <color> glass-control: [#0e0e11, #0e0e0e, #0e0e0e, #0e0e0e, #ffffff1a, #141519][desk-variant];
+    out property <color> glass-hover: desk-variant == 4 ? #ffffff29 : #ffffff0d;
+    out property <color> glass-selected: desk-variant == 4 ? #ffffff1f : #ffffff17;
+    out property <color> glass-pressed: #ffffff24;
+    out property <color> glass-item-highlight: desk-variant == 4 ? #ffffff29 : #ffffff00;
+    out property <color> glass-item-edge: #ffffff14;
+    out property <color> glass-edge-strong: #ffffff4d;
+    out property <color> glass-solid: desk-variant == 4 ? #14161cfa : #141519;
+    out property <color> primary-top: primary;
+    out property <color> primary-bottom: primary;
+    // Texto de linha e de botão contornado (#ccc–#ddd do protótipo) e o secundário.
+    out property <color> desk-on-muted: #cfcacd;
+    out property <color> desk-on-subtle: desk-text-muted;
+    out property <color> keycap-bg: #ffffff08;
+    out property <color> divider: #ffffff38;
+    out property <color> brand-red: #e3161e;
+    out property <color> splash-bg: #000000;
+    out property <color> splash-track: #1a1a20;
+    out property <color> splash-muted: #958f94;
+    out property <color> splash-bar: #d8c8bc;
+    out property <color> medal-gold: #f0cf6a;
+    out property <color> medal-silver: #c9d0da;
+    out property <color> medal-bronze: #d39a6a;
+    out property <color> focus-ring: #ffffff99;
+    out property <color> focus-fill: #ffffff0d;
+    out property <color> focus-glow: #ffffff14;
+    // Sombra só no que flutua: menus (float), diálogos (layer) e a janela.
+    out property <color> shadow-float-color: #00000099;
+    out property <length> shadow-float-y: 24px;
+    out property <length> shadow-float-blur: 60px;
+    out property <color> shadow-layer-color: #00000099;
+    out property <length> shadow-layer-y: 40px;
+    out property <length> shadow-layer-blur: 100px;
+    out property <color> shadow-window-color: #00000073;
+    out property <length> shadow-window-y: 30px;
+    out property <length> shadow-window-blur: 80px;
+
+    in-out property <string> font-heading: "Poppins";
+    in-out property <string> font-desk: "Plus Jakarta Sans";
+    in-out property <string> font-wordmark: "Source Sans 3";
+
+    in-out property <image> custom-background;
+    in-out property <bool> has-custom-background: false;
+    out property <length> desk-display: 56px * text-scale;
+    out property <length> desk-headline: 28px * text-scale;
+    out property <length> desk-title: 20px * text-scale;
+    out property <length> desk-body: 15px * text-scale;
+    out property <length> desk-label-lg: 17px * text-scale;
+    out property <length> desk-label: 15px * text-scale;
+    out property <length> desk-label-sm: 13px * text-scale;
+    out property <length> desk-overline: 12px * text-scale;
+    out property <length> desk-keycap: 12px * text-scale;
+    out property <length> desk-wordmark: 22px;
+
+    out property <length> space-4: 4px;
+    out property <length> space-6: 6px;
+    out property <length> space-8: 8px;
+    out property <length> space-12: 12px;
+    out property <length> space-16: 16px;
+    out property <length> space-20: 20px;
+    out property <length> space-24: 24px;
+    out property <length> space-28: 28px;
+    out property <length> space-36: 36px;
+    out property <length> space-40: 40px;
+    out property <length> space-48: 48px;
+    out property <length> radius-icon: 7px;
+    out property <length> radius-thumb: 7px;
+    // Liquid Glass com "Controles em pílula": controles e botões ficam totalmente redondos.
+    property <bool> pill: desk-theme == 4 && glass-pill;
+    out property <length> radius-control: pill ? 999px : 9px;
+    out property <length> radius-row: 10px;
+    out property <length> radius-button: pill ? 999px : 11px;
+    out property <length> radius-card: 16px;
+    out property <length> radius-hero: 18px;
+    // Blocos do GrupoDeBlocos, capas e botão pequeno do tema TAKO.
+    out property <length> radius-block: 11px;
+    out property <length> radius-full: 999px;
+    out property <length> topbar-height: 52px;
+    // BarraDaJanela: a barra da própria janela (sem moldura do Windows), por cima da arte.
+    out property <length> window-control-width: 40px;
+    out property <length> window-control-height: 36px;
+    out property <color> window-close-hover: #c42b1c;
+    out property <length> list-width: 344px;
+    out property <length> list-width-narrow: 300px;
+    // ListaDeJogos (TAKO): a coluna fixa da biblioteca, de baixo da barra até o pé da janela.
+    out property <length> list-column: 292px;
+    out property <length> list-row-height: 52px;
+    // Linha da lista de jogos no desktop: 42, ícone do jogo de 28.
+    out property <length> game-row-height: 42px;
+    out property <length> control-height: 44px;
+    out property <length> primary-height: 56px;
+    // BotaoDesktop: altura e chip do ícone (grande e pequeno).
+    out property <length> button-height: 46px;
+    out property <length> button-height-sm: 38px;
+    out property <length> button-chip: 36px;
+    out property <length> button-chip-sm: 30px;
+    // TelaBiblioteca: Destaque, Voltar a jogar ao lado e os blocos (valor e rótulo).
+    out property <length> hero-height: 400px;
+    out property <length> hero-side-width: 300px;
+    out property <length> tile-value-height: 78px;
+    out property <length> tile-label-height: 40px;
+    out property <length> round-button: 52px;
+    out property <length> card-height: 248px;
+    out property <length> focus-ring-width: 3px;
+    out property <length> settings-row-height: 64px;
+    out property <length> thumb-size: 40px;
+    out property <length> list-icon-size: 28px;
+    out property <length> list-icon-compact: 24px;
+    // ListaDeJogos recolhida: 76 de largura e ícones de 46.
+    out property <length> list-column-collapsed: 76px;
+    out property <length> list-icon-collapsed: 46px;
+    out property <length> glass-light-width: 560px;
+    out property <length> glass-light-height: 380px;
+    out property <length> glass-highlight-height: 150px;
+
+    // Tempo (MovimentoBase): com "Reduzir animações" tudo vira 0.
+    out property <duration> tempo-hover: reduce-motion ? 0ms : 200ms;
+    out property <duration> tempo-foco: reduce-motion ? 0ms : 150ms;
+    out property <duration> tempo-estado: reduce-motion ? 0ms : 250ms;
+    out property <duration> tempo-dialogo: reduce-motion ? 0ms : 450ms;
+    out property <duration> tempo-pagina: reduce-motion ? 0ms : 450ms;
+    out property <duration> tempo-pagina-entra: reduce-motion ? 0ms : 550ms;
+    out property <duration> tempo-saida: reduce-motion ? 0ms : 200ms;
+    out property <duration> tempo-menu-escala: reduce-motion ? 0ms : 200ms;
+    out property <duration> tempo-troca: reduce-motion ? 0ms : 500ms;
+    out property <duration> tempo-escada: reduce-motion ? 0ms : 55ms;
+    out property <duration> tempo-lista: reduce-motion ? 0ms : 500ms;
+    out property <duration> tempo-arte: reduce-motion ? 0ms : 800ms;
+    out property <duration> atraso-arte: reduce-motion ? 0ms : 1800ms;
+    out property <duration> tempo-destaque: reduce-motion ? 0ms : 900ms;
+    // Cores da arte deslizando para a paleta nova (TAKO).
+    out property <duration> tempo-cor: reduce-motion ? 0ms : 1000ms;
+    out property <duration> tempo-zoom: reduce-motion ? 0ms : 1200ms;
+    out property <duration> tempo-contador: reduce-motion ? 0ms : 1100ms;
+    out property <duration> tempo-radar: reduce-motion ? 0ms : 900ms;
+    out property <duration> tempo-pulso: reduce-motion ? 0ms : 1600ms;
+    out property <color> toast-success: #1a7f37;
+    out property <color> toast-warning: #9a6700;
+    out property <color> toast-error: #cf222e;
+    out property <color> toast-shadow: #00000066;
+    out property <color> toast-hover: #0000001a;
+    out property <duration> tempo-carrossel: reduce-motion ? 0ms : 7000ms;
+    out property <duration> tempo-onboarding: reduce-motion ? 0ms : 280ms;
+    // Uma curva para quase tudo; os crossfades de arte e de opacidade usam `ease`.
+    out property <easing> curva-entrada: cubic-bezier(0.22, 1, 0.36, 1);
+    // Troca de jogo no destaque: o texto apaga em 120 e o novo acende em 200.
+    out property <duration> tempo-texto-sai: reduce-motion ? 0ms : 120ms;
+    out property <duration> tempo-texto-entra: reduce-motion ? 0ms : 200ms;
+    public pure function text-fade(entering: bool) -> duration {
+        return entering ? tempo-texto-entra : tempo-texto-sai;
+    }
+    // Entra em `page-time`; ao preparar a entrada (antes de mover), troca na hora.
+    public pure function enter(entering: bool) -> duration {
+        return entering ? page-time : 0ms;
+    }
+    public pure function page-fade(entering: bool) -> duration {
+        return reduce-motion ? 0ms : (entering ? tempo-pagina-entra : tempo-pagina);
+    }
+    // Troca de modo (TrocaDeModo): sai em 200, entra em 450.
+    public pure function mode-fade(entering: bool) -> duration {
+        return entering ? tempo-pagina : tempo-saida;
+    }
+    // Troca de aba ou de categoria (TrocaDeTela › abas internas): sai em 80, entra em 120.
+    public pure function list-fade(entering: bool) -> duration {
+        return entering ? focus-time * 0.75 : focus-time / 2;
+    }
+    // Pisca da linha aberta por um link: acende de uma vez e apaga em 70% de `tempo-pulso`.
+    public pure function flash-fade(on: bool) -> duration {
+        return on ? 0ms : tempo-pulso * 0.7;
+    }
+    // Aviso: entra em `tempo-dialogo`, sai em `tempo-saida`. Com Reduzir animações, na hora.
+    public pure function toast-fade(entering: bool) -> duration {
+        return entering ? tempo-dialogo : tempo-saida;
+    }
+    // Troca de jogo: crossfade ease em 800 ms; desfoque some 1,8 s depois.
+    public pure function art-fade(entering: bool) -> duration {
+        return entering ? tempo-arte : 0ms;
+    }
+    public pure function art-settle(entering: bool) -> duration {
+        return entering ? tempo-arte : 0ms;
+    }
+    public pure function art-unblur(entering: bool) -> duration {
+        return entering ? tempo-arte : 0ms;
+    }
+    public pure function art-unblur-delay(entering: bool) -> duration {
+        return entering ? atraso-arte : 0ms;
+    }
+    // Página do jogo (TelaJogo): a arte nova assenta de 1,05 a 1 em 1,8 s.
+    out property <duration> tempo-assenta: reduce-motion ? 0ms : 1800ms;
+    // Altura do destaque da página do jogo (560 a 700, 86% da janela).
+    public pure function game-hero-h(win: length) -> length {
+        return max(560px, min(700px, win * 0.86));
+    }
+    // Entrada do app (só na abertura): arte, barra, lista, título, faixa e ações e cartões acendem um a um, 70 depois
+    // da parte anterior, cada um em `tempo-pagina` subindo `intro-rise`. Com "Reduzir animações", tudo de uma vez.
+    public pure function intro-delay(step: int) -> duration {
+        return reduce-motion ? 0ms : step * 70ms;
+    }
+    out property <length> intro-rise: 12px;
+    // Entrada da tela cheia (BRAND-002): cada tentáculo chega em 450 e o véu sai em 200. Com "Reduzir animações" a
+    // entrada nem aparece (o Tako não liga `intro`); os zeros só garantem que nada anime.
+    out property <duration> tempo-intro-polvo: reduce-motion ? 0ms : 450ms;
+    out property <duration> tempo-intro-sai: reduce-motion ? 0ms : 200ms;
+    // O véu aparece de uma vez (cobre a primeira tela no 1º quadro) e só a saída anima.
+    public pure function intro-fade(on: bool) -> duration {
+        return on ? 0ms : tempo-intro-sai;
+    }
+    // TelaCarregamento: cada tentáculo chega em 1 s (ease-out-back); com "Reduzir animações", o polvo já vem pronto.
+    out property <duration> tempo-tentaculo: reduce-motion ? 0ms : 1000ms;
+    // BRAND-001: no app o polvo se monta sozinho (sem barra), os sete tentáculos chegando em 1,4 s.
+    out property <duration> tempo-montagem: reduce-motion ? 0ms : 1400ms;
+    // Escala: com "Reduzir animações" tudo fica em 1.
+    out property <float> escala-pressionado: reduce-motion ? 1 : 0.98;
+    out property <float> escala-entrada: reduce-motion ? 1 : 0.98;
+    out property <float> escala-menu: reduce-motion ? 1 : 0.98;
+    out property <float> escala-vista: reduce-motion ? 1 : 0.985;
+    out property <float> escala-capa: reduce-motion ? 1 : 1.05;
+    out property <float> escala-destaque: reduce-motion ? 1 : 1.03;
+}

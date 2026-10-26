@@ -1,0 +1,225 @@
+/* PerfilFamilia (README do PerfilFamilia e preview.html): à esquerda os perfis do PC
+   (o escolhido como item ativo), à direita grupos de linhas: Hoje (tempo usado com barra
+   role="progressbar"), Limites (tempo por dia, horário, classificação) e Acesso (PIN,
+   jogos acima da classificação). Não existe loja no Tako.
+   Sem dado, o bloco some. Animações apenas em transform e opacity. */
+
+.container {
+  /* Medidas de PerfilFamilia (README do PerfilFamilia e preview.html) */
+  --familia-col-largura: 360px;
+  --familia-col-gap: 24px;
+  --familia-avatar-tamanho: 40px;
+  --familia-item-padding: 8px 12px;
+  --familia-item-raio: 10px;
+  --familia-item-gap: 12px;
+  --familia-pbar-altura: 4px;
+  --familia-pbar-raio: 4px;
+  --familia-pbar-max-largura: 380px;
+  --familia-painel-raio: 16px;
+  --familia-painel-padding: 6px;
+
+  display: grid;
+  grid-template-columns: var(--familia-col-largura) minmax(0, 1fr);
+  gap: var(--familia-col-gap);
+  align-items: start;
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .container {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Coluna esquerda: Lista de perfis */
+.colunaPerfis {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--familia-painel-padding);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--familia-painel-raio);
+}
+
+.perfisTitulo {
+  padding: 10px 10px 8px;
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.perfisLista {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.perfilItem {
+  appearance: none;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--familia-item-raio);
+  padding: var(--familia-item-padding);
+  display: flex;
+  align-items: center;
+  gap: var(--familia-item-gap);
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  transition:
+    background var(--tempo-hover) var(--curva-entrada),
+    border-color var(--tempo-hover) var(--curva-entrada);
+}
+
+.perfilItem:hover {
+  background: var(--glass-hover);
+}
+
+.perfilItemAtivo {
+  background: var(--glass-selected);
+  border-color: var(--line-strong);
+}
+
+.avatar {
+  flex-shrink: 0;
+  width: var(--familia-avatar-tamanho);
+  height: var(--familia-avatar-tamanho);
+  border-radius: 50%;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.avatarAdicionar {
+  flex-shrink: 0;
+  width: var(--familia-avatar-tamanho);
+  height: var(--familia-avatar-tamanho);
+  border-radius: 50%;
+  border: 1px dashed var(--line-strong);
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+.perfilInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.perfilNome {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.perfilDetalhe {
+  font-family: var(--font-text);
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.botaoAdicionar {
+  color: var(--text-muted);
+}
+
+.botaoAdicionar .perfilNome {
+  color: var(--text-muted);
+}
+
+.botaoAdicionar:hover .perfilNome,
+.botaoAdicionar:hover .avatarAdicionar {
+  color: var(--text);
+}
+
+/* Coluna direita: Controles de família */
+.colunaControles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+}
+
+/* Bloco Hoje */
+.hojeSecao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.hojeTitulo {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.hojeCard {
+  padding: 14px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--familia-painel-raio);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.hojeTextos {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hojeTempoUsado {
+  font-family: var(--font-heading);
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.hojeTempoRestante {
+  font-family: var(--font-text);
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.progressoTrilho {
+  width: 100%;
+  max-width: var(--familia-pbar-max-largura);
+  height: var(--familia-pbar-altura);
+  background: var(--tile);
+  border-radius: var(--familia-pbar-raio);
+  overflow: hidden;
+}
+
+.progressoPreenchimento {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: left;
+  transform: scaleX(var(--progresso, 0));
+  background: var(--accent);
+  border-radius: var(--familia-pbar-raio);
+  transition: transform var(--tempo-estado) var(--curva-entrada);
+}

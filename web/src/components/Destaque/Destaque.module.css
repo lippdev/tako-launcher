@@ -1,0 +1,173 @@
+/* Destaque (README): arte de borda a borda (560–700) que some na lista e no canvas. Dados embaixo à esquerda;
+   situação, título, descrição e ações embaixo à direita. A troca de jogo (TrocaDeJogo) anima só `transform` e
+   `opacity`; o desfoque do protótipo fica de fora (regra do projeto). */
+
+.destaque {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  container-type: inline-size;
+}
+
+/* Página do jogo: a vista inteira (a barra de cima fica por cima), nunca abaixo de 560. Quem usa pode trocar a
+   altura e o mínimo por `--heroi-altura` e `--heroi-minimo`. */
+.pagina {
+  height: var(--heroi-altura, 100%);
+  min-height: var(--heroi-minimo, 560px);
+}
+
+/* Rolando a página do jogo, o miolo sai antes da arte: sobe e some na primeira metade da vista
+   (`--pagina-jogo` vem da PaginaDoJogo; fora dela a animação não tem linha do tempo e fica parada). */
+.pagina .interno {
+  animation: interno-sai linear both;
+  animation-timeline: --pagina-jogo;
+  animation-range: 0 55vh;
+}
+
+@keyframes interno-sai {
+  to {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--space-48)));
+  }
+}
+
+:root[data-reduce-motion="true"] .pagina .interno {
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pagina .interno {
+    animation: none !important;
+  }
+}
+
+/* Visão geral: 400 de altura, raio de 18; em janela estreita, onde a identidade e os dados se empilham, cresce o que
+   precisar (o `padding-top` do miolo guarda o lugar dos chips). */
+.visao {
+  min-height: var(--hero-height);
+  border-radius: var(--radius-hero);
+}
+
+/* Degradês de leitura: de baixo (canvas 100% → 88% em 20% → 30% em 52% → 0 em 75%) e da direita a 60%. Seguram
+   também arte clara (EstadoArteClara). */
+.degrade {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      to top,
+      var(--canvas) 0%,
+      color-mix(in srgb, var(--canvas) 88%, transparent) 20%,
+      color-mix(in srgb, var(--canvas) 30%, transparent) 52%,
+      transparent 75%
+    ),
+    linear-gradient(to left, color-mix(in srgb, var(--canvas) 60%, transparent), transparent 55%);
+}
+
+.interno {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--space-24);
+  width: 100%;
+  padding: 0 var(--space-40) 46px;
+}
+
+.visao .interno {
+  padding: 56px var(--space-24) var(--space-24);
+}
+
+.esquerda {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  min-width: 0;
+}
+
+.direita {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+  max-width: 520px;
+  min-width: 0;
+  text-align: right;
+}
+
+.chips {
+  position: absolute;
+  z-index: 3;
+  top: calc(var(--topbar-height) + var(--space-24));
+  right: var(--space-40);
+  display: flex;
+  gap: var(--space-8);
+}
+
+.visao .chips {
+  top: var(--space-16);
+  right: var(--space-24);
+}
+
+.titulo {
+  margin: var(--space-16) 0 18px;
+}
+
+.descricao {
+  margin-bottom: 18px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: color-mix(in srgb, var(--text) 86%, transparent);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+
+/* Janela estreita (960 × 600 com a lista aberta dá uns 670 de largura): a barra de dados desce para baixo da
+   identidade e o destaque cresce o que precisar. */
+@container (max-width: 1080px) {
+  .interno {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: var(--space-24);
+  }
+
+  .direita {
+    align-self: flex-end;
+  }
+
+  .esquerda {
+    align-items: stretch;
+  }
+}
+
+/* TrocaDeJogo: cada parte volta em escada de 55 ms (`--d` de 0 a 5), em 500 (opacidade) e 650 (subida) ms. */
+.parte {
+  transition:
+    opacity var(--tempo-troca) var(--curva-entrada),
+    transform calc(var(--tempo-troca) + 150ms) var(--curva-entrada);
+  transition-delay: calc(var(--d, 0) * var(--tempo-escada));
+}
+
+/* Saindo: 200 ms, sem atraso; sobe de 14 para baixo e some. */
+.destaque[data-trocando="true"] .parte {
+  opacity: 0;
+  transform: translateY(var(--intro-rise));
+  transition-duration: var(--tempo-saida);
+  transition-delay: 0ms;
+}
+
+/* Visão geral: a arte dá um zoom de 1,03 ao passar o mouse, em 1,2 s (README do Destaque). Só `transform`. */
+.visao > :first-child {
+  transition: transform 1200ms var(--curva-entrada);
+}
+
+.visao:hover > :first-child {
+  transform: scale(1.03);
+}

@@ -1,0 +1,282 @@
+name: Release
+
+# Tako em Rust (PRD D-07, MIG-040). Quando sai cada release (regras em build/resolve-release.sh; hífen = pré-release):
+#  - Só manual durante a alpha (sem lançamento público): sem release automática no push da main nem noturna agendada.
+#    Para voltar, recoloque "push: branches: [main]" e o "schedule" (estão no histórico do git).
+#  - Run workflow na main, canal stable: estável, com a versão da primeira seção "## [X.Y.Z]" do CHANGELOG.md. Se o
+#    topo for pré-release ou a tag já existir, o workflow para no "resolve" e nada é publicado.
+#  - Actions > Release > Run workflow na develop, canal alpha ou beta: a pré-release sai com o próximo número
+#    (0.2.0-alpha.3, 0.2.0-beta.1...). Notas da seção da versão ou, sem ela, da [Unreleased].
+#  - Run workflow em outra branch, com "publish" desmarcado: só compila e guarda os arquivos como artefato.
+#  - Run workflow com o canal nightly: noturna da develop (PLAT-008), só se ela mudou. Ficam as 7 noturnas mais novas.
+# Saída: só Windows (o instalador, com a interface web e o CEF; só x64). Linux e macOS estão pausados durante a alpha
+# (PRD D-20) e voltam na Fase 6 (WEB-80 a WEB-83); o job "unix" e o Packaging do Linux estão no histórico do git.
+# Testes não rodam aqui (PRD D-13): o workflow só empacota.
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "Channel: alpha, beta or nightly (from develop), stable (from main)."
+        type: choice
+        options: [alpha, beta, nightly, stable]
+        default: alpha
+      base_version:
+        description: "Optional X.Y.Z for alpha/beta. Empty = top of CHANGELOG.md (next patch if it already shipped)."
+        required: false
+      publish:
+        description: "Publish: create the tag and the GitHub release. Unticked, just build."
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.version.outputs.build }}
+      publish: ${{ steps.version.outputs.publish }}
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      tag: ${{ steps.version.outputs.tag }}
+      sha: ${{ steps.version.outputs.sha }}
+      channel: ${{ steps.version.outputs.channel }}
+    steps:
+      - name: Checkout (with tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # O agendamento roda na branch padrão; a noturna é da develop.
+          ref: ${{ github.event_name == 'schedule' && 'develop' || github.ref }}
+
+      - name: Resolve version
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.event_name == 'schedule' && 'refs/heads/develop' || github.ref }}
+          CHANNEL: ${{ github.event_name == 'push' && 'stable' || github.event_name == 'schedule' && 'nightly' || github.event.inputs.channel }}
+          BASE_VERSION: ${{ github.event.inputs.base_version }}
+          PUBLISH: ${{ github.event_name == 'schedule' || github.event.inputs.publish }}
+        run: build/resolve-release.sh
+
+      - name: Summary
+        env:
+          BUILD: ${{ steps.version.outputs.build }}
+          PUBLISH: ${{ steps.version.outputs.publish }}
+          VERSION: ${{ steps.version.outputs.version }}
+          REASON: ${{ steps.version.outputs.reason }}
+        run: |
+          {
+            if [[ "$BUILD" != "true" ]]; then
+              echo "### Nenhuma release"; echo; echo "$REASON"
+            else
+              echo "### Tako $VERSION"; echo; echo "- Publicar: $PUBLISH"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload release notes
+        if: steps.version.outputs.build == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release-notes.md
+          if-no-files-found: error
+
+  windows:
+    needs: resolve
+    if: needs.resolve.outputs.build == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows só em x86-64 (PRD §8.2); o empacotamento aceita arm64 se um dia entrar.
+        arch: [x64]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-windows-${{ matrix.arch }}
+
+      # Interface web (web/dist): o Package-Tako.ps1 roda npm ci e npm run build.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # Runtime do CEF baixado pelo scripts/cef-setup.ps1 (chamado pelo Package-Tako.ps1) em %LOCALAPPDATA%\tako-dev,
+      # guardado por versão do CEF no Cargo.lock.
+      - name: CEF version
+        id: cef
+        shell: pwsh
+        run: |
+          $lock = Get-Content -LiteralPath Cargo.lock -Raw
+          $match = [regex]::Match($lock, '(?m)^name = "cef"\r?\nversion = "([^"]+)"')
+          if (-not $match.Success) { throw 'Versão da crate cef ausente no Cargo.lock.' }
+          "version=$($match.Groups[1].Value)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+      - uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/tako-dev
+          key: cef-windows-${{ matrix.arch }}-${{ steps.cef.outputs.version }}
+
+      - name: Install Inno Setup (if missing)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+
+      # ScreenScraper (ADR-0022): credenciais do software nos segredos SCREENSCRAPER_DEVID e SCREENSCRAPER_DEVPASSWORD
+      # (e SCREENSCRAPER_SOFTNAME, padrão "Tako"). Sem eles, o ScreenScraper aparece como indisponível nas Configurações.
+      - name: Build installer (web interface + CEF)
+        shell: pwsh
+        env:
+          TAKO_SCREENSCRAPER_DEV_ID: ${{ secrets.SCREENSCRAPER_DEVID }}
+          TAKO_SCREENSCRAPER_DEV_PASSWORD: ${{ secrets.SCREENSCRAPER_DEVPASSWORD }}
+          TAKO_SCREENSCRAPER_SOFT_NAME: ${{ secrets.SCREENSCRAPER_SOFTNAME }}
+        run: .\build\rust\Package-Tako.ps1 -Arch ${{ matrix.arch }} -Version "${{ needs.resolve.outputs.version }}"
+
+      - name: Validar FSE real (enable e disable)
+        shell: powershell
+        run: ./crates/tako-platform/tests/fse-integration.ps1 -PayloadDirectory "artifacts/rust/windows-${{ matrix.arch }}/fse"
+
+      # Assinatura de código (PLAT-005). Desligada até existirem as variáveis do SignPath no repositório.
+      - name: Upload unsigned build for signing
+        id: unsigned
+        if: needs.resolve.outputs.publish == 'true' && vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-${{ needs.resolve.outputs.version }}-${{ matrix.arch }}
+          path: dist/Tako-Setup-${{ matrix.arch }}.exe
+          if-no-files-found: error
+
+      - name: Sign with SignPath
+        if: needs.resolve.outputs.publish == 'true' && vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: dist-signed
+
+      - name: Use the signed files
+        if: needs.resolve.outputs.publish == 'true' && vars.SIGNPATH_ORGANIZATION_ID != ''
+        shell: pwsh
+        run: |
+          foreach ($name in @("Tako-Setup-${{ matrix.arch }}.exe")) {
+            $signed = Join-Path "dist-signed" $name
+            if (-not (Test-Path -LiteralPath $signed)) { throw "SignPath did not return $name" }
+            if ((Get-AuthenticodeSignature -LiteralPath $signed).Status -ne "Valid") { throw "$name is not validly signed" }
+            Copy-Item -LiteralPath $signed -Destination (Join-Path "dist" $name) -Force
+          }
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tako-${{ needs.resolve.outputs.version }}-windows-${{ matrix.arch }}
+          path: dist/Tako-Setup-${{ matrix.arch }}.exe
+          if-no-files-found: error
+
+  publish:
+    needs: [resolve, windows]
+    if: needs.resolve.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # Só os artefatos finais: o "unsigned-*" (entrada do SignPath) tem os mesmos nomes e não pode sobrescrevê-los.
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: Tako-${{ needs.resolve.outputs.version }}-*
+          path: dist
+          merge-multiple: true
+
+      - name: Download release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: dist
+
+      - name: Release notes with downloads
+        run: |
+          # shellcheck disable=SC2016 # crases literais (Markdown).
+          describe() {
+            case "$1" in
+              Tako-Setup-*.exe) echo 'installs the app for your user (no admin), with a Start menu shortcut and an optional desktop shortcut.' ;;
+            esac
+          }
+          # shellcheck disable=SC2086 # $2 é uma lista de globs, expandida de propósito.
+          section() {
+            local files; files="$(cd dist && for p in $2; do ls -1 $p 2>/dev/null; done || true)"
+            [[ -z "$files" ]] && return
+            echo "**$1**"; echo
+            while read -r f; do echo "- \`$f\` — $(describe "$f")"; done <<< "$files"
+            echo
+          }
+          notes="$(cat dist/release-notes.md)"
+          rm dist/release-notes.md
+          {
+            printf '%s\n' "${notes%%$'\n---\n'*}"
+            echo "### Downloads"; echo
+            section "Windows (x64 = Intel/AMD)" "Tako-Setup-*"
+            # Desde a 0.2.0-alpha.23 (interface web com o CEF, uma pasta de ~450 MB) não há mais o portátil.
+            # shellcheck disable=SC2016 # crases literais (Markdown).
+            echo 'No portable `.exe` for Windows anymore: install with `Tako-Setup-x64.exe`. To keep the library of a portable copy, close it and copy the contents of its `Tako_Data` folder to `%LOCALAPPDATA%\Tako` before the first start of the installed version.'; echo
+            echo "---"; echo
+            printf '%s\n' "${notes##*$'\n---\n\n'}"
+          } > release-notes.md
+          cat release-notes.md
+          ls -l dist
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.resolve.outputs.tag }}
+          target_commitish: ${{ needs.resolve.outputs.sha }}
+          name: Tako ${{ needs.resolve.outputs.version }}
+          prerelease: ${{ needs.resolve.outputs.prerelease }}
+          make_latest: ${{ needs.resolve.outputs.prerelease == 'false' }}
+          fail_on_unmatched_files: true
+          generate_release_notes: false
+          body_path: release-notes.md
+          files: dist/Tako-*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Keep the 7 newest nightlies
+        if: needs.resolve.outputs.channel == 'nightly'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release list --limit 200 --json tagName --jq '.[].tagName' \
+            | grep -E '^v[0-9.]+-nightly\.[0-9]+$' | sort -t. -k4 -rn | tail -n +8 \
+            | while read -r tag; do gh release delete "$tag" --cleanup-tag --yes; done
+
+  # PR de atualização no microsoft/winget-pkgs para releases estáveis. Desligado até existir o segredo WINGET_TOKEN.
+  winget:
+    needs: [resolve, publish]
+    if: needs.publish.result == 'success' && needs.resolve.outputs.prerelease == 'false'
+    runs-on: ubuntu-latest
+    env:
+      WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+    steps:
+      - name: Submit to winget-pkgs
+        if: env.WINGET_TOKEN != ''
+        uses: vedantmgoyal9/winget-releaser@v2
+        with:
+          identifier: lippdev.Tako
+          release-tag: ${{ needs.resolve.outputs.tag }}
+          installers-regex: 'Tako-Setup-x64\.exe$'
+          fork-user: lippdev
+          token: ${{ env.WINGET_TOKEN }}

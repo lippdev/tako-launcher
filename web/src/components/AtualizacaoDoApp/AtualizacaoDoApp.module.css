@@ -1,0 +1,142 @@
+/* AtualizacaoDoApp (README da AtualizacaoDoApp): diálogo (480) com estados de atualização */
+
+/* Oculta visualmente o cabeçalho padrão do Dialogo para renderizar o cabeçalho personalizado */
+.dialogo > header {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.cabecalho {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-14);
+}
+
+.titulos {
+  flex: 1;
+  min-width: 0;
+}
+
+.titulo {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+.subtitulo {
+  margin: var(--space-4) 0 0;
+  font-family: var(--font-text);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.botaoFechar {
+  composes: ring from "../../lib/focus.module.css";
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--tempo-hover) var(--curva-estado),
+    color var(--tempo-hover) var(--curva-estado);
+}
+
+.botaoFechar:hover {
+  background: var(--glass-hover);
+  color: var(--text);
+}
+
+/* Seção de Novidades */
+.novidadesTitulo {
+  margin: var(--space-16) 0 var(--space-8);
+  font-family: var(--font-text);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.listaNovidades {
+  margin: 0;
+  padding-left: var(--space-18);
+  font-family: var(--font-text);
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--text);
+}
+
+/* Estado: Baixando (barra de progresso com transform: scaleX) */
+.trilhoProgresso {
+  position: relative;
+  width: 100%;
+  height: var(--atualizacao-progresso-altura);
+  margin-top: var(--space-16);
+  border-radius: var(--radius-full);
+  background: var(--control-track);
+  overflow: hidden;
+}
+
+.barraProgresso {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--accent);
+  transform-origin: left;
+  transition: transform var(--tempo-estado) var(--curva-estado);
+}
+
+.ajudaTexto {
+  margin: var(--space-8) 0 0;
+  font-family: var(--font-text);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+/* Link para as notas completas da release (WEB-33) */
+.linkNotas {
+  composes: ring from "../../lib/focus.module.css";
+  display: block;
+  margin: var(--space-8) 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-family: var(--font-text);
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.linkNotas:hover {
+  text-decoration: underline;
+}
+
+/* Estado: Erro */
+.mensagemErro {
+  margin: var(--space-14) 0 0;
+  font-family: var(--font-text);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--error);
+}

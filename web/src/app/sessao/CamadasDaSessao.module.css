@@ -1,0 +1,8 @@
+/* "Fechando o jogo…": o texto do diálogo (o mesmo tom dos outros diálogos de uma frase). */
+.texto {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}

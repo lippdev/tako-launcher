@@ -1,0 +1,107 @@
+/* Diálogos de editar, adicionar, remover e Fontes e IDs (WEB-12c). Só tokens; sem animação própria (o Dialogo anima). */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.target {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.targetLabel {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.targetValue {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+
+.problem {
+  margin: 0;
+  color: var(--error);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.info {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.lead {
+  margin: 0 0 var(--space-12);
+  color: var(--text-dim);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.search {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-8);
+}
+
+.search > :first-child {
+  flex: 1;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.typing {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-12) var(--space-16);
+  border-top: 1px solid var(--settings-separator);
+}
+
+.typingRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-8);
+}
+
+.typingRow > :first-child {
+  flex: 1;
+}
+
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.confirmTitle {
+  margin: 0;
+  font-weight: 700;
+}
+
+.confirmActions {
+  display: flex;
+  gap: var(--space-8);
+}
+
+.marker {
+  display: inline-block;
+  min-width: 1.4em;
+  color: var(--accent);
+}

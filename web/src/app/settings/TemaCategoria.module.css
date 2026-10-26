@@ -1,0 +1,7 @@
+/* README da TelaTema: cinco cartões lado a lado, com 12 de intervalo e 14 de respiro dentro do grupo. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-12);
+  padding: 14px;
+}

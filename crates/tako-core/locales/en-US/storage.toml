@@ -1,0 +1,7 @@
+[storage]
+title = "Storage"
+desc = "How much space installed games take, per drive and per game."
+text = "Steam and Epic report the size; for other games Tako measures the folder after reading the stores. To see them all, sort the library by size."
+disks = "DRIVES"
+largest = "LARGEST GAMES"
+empty = "No installed game with a known size yet"

@@ -1,0 +1,7 @@
+/* O texto de abertura da seção, como o de Emuladores e ROMs. */
+.intro {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}

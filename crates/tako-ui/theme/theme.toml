@@ -1,0 +1,7 @@
+id = "tako-default"
+name = "Tako"
+version = "1.0.0"
+author = "Tako"
+api = 1
+entry = "main.slint"
+description = "Tema padrão: a cor do jogo em foco toma a tela inteira."

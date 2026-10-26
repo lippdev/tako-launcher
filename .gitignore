@@ -1,13 +1,19 @@
-bin/
-obj/
-.vs/
 .idea/
-*.user
-*.suo
-TestResults/
 artifacts/
 *.log
 *.db
 *.db-wal
 *.db-shm
 .env
+.gstack/
+.DS_Store
+packaging/fse-dev/layout/
+dist/
+Tako_Data/
+
+# Rust
+/target/
+.claude/
+
+# Biblioteca real para o `npm run dev` (`tako dev-snapshot`, WEB-DEV-01): dados pessoais, nunca no git.
+web/dev-data/

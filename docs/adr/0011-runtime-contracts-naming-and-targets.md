@@ -1,6 +1,6 @@
 # ADR-0011: Nome e frameworks-alvo do runtime compartilhado
 
-- Status: Proposta
+- Status: Histórico (implementação C#). Substituída pelo workspace Rust do PRD v0.2 §5.1
 - Data: 2026-10-14
 
 ## Contexto

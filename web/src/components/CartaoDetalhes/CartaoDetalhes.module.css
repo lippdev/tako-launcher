@@ -1,0 +1,66 @@
+/* CartaoDetalhes (README): linhas de 39 alternadas no `tile`, numa caixa de raio 16 com contorno e padding 6. */
+
+.caixa {
+  padding: var(--space-6);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-card);
+}
+
+.linha {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-12);
+  min-height: 39px;
+  padding: 0 var(--space-12);
+  border-radius: 7px;
+  font-size: 12.5px;
+}
+
+.linha:nth-child(odd) {
+  background: var(--tile);
+}
+
+.rotulo {
+  flex: none;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--text-dim);
+}
+
+.valor {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  min-width: 0;
+  font-family: var(--font-heading);
+  font-weight: 600;
+}
+
+.texto {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ponto {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+}
+
+/* Liquid Glass (protótipo, `.box`): grupo de vidro. */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .caixa {
+  border-color: var(--vidro-group-edge);
+  background: var(--group);
+  box-shadow: var(--vidro-group-shadow);
+  backdrop-filter: var(--vidro-group-blur);
+}

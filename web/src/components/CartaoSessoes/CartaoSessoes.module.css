@@ -1,0 +1,140 @@
+/* CartaoSessoes (README): a barra de dados sobre a arte. Ícone de 20, rótulo 12/700 em caixa alta, valor 15/600,
+   linhas de 1 entre os itens. Sombras de texto para ler sobre qualquer arte (EstadoArteClara). */
+
+.barra {
+  --sombra-leitura: 0 1px 8px color-mix(in srgb, var(--canvas) 80%, transparent);
+
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  max-width: 100%;
+  /* Janela estreita: os dados passam para a linha de baixo em vez de sair do destaque. */
+  flex-wrap: wrap;
+  row-gap: var(--space-8);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  min-width: 0;
+  padding: 0 22px;
+}
+
+.item:first-child {
+  padding-left: 0;
+}
+
+.item + .item {
+  border-left: 1px solid color-mix(in srgb, var(--text) 22%, transparent);
+}
+
+.item svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  color: var(--text);
+  filter: drop-shadow(0 1px 6px color-mix(in srgb, var(--canvas) 70%, transparent));
+}
+
+.rotulo {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--text) 72%, transparent);
+  text-shadow: var(--sombra-leitura);
+}
+
+.valor {
+  display: flex;
+  align-items: center;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-shadow: var(--sombra-leitura);
+}
+
+/* Nota do Metacritic: etiqueta colorida (verde 75+, amarelo 50–74, vermelho até 49), sempre com o número. */
+.nota {
+  display: inline-grid;
+  place-items: center;
+  height: 18px;
+  min-width: 22px;
+  margin-right: 7px;
+  padding: 0 4px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--on-primary);
+  text-shadow: none;
+}
+
+.good {
+  background: var(--metacritic-good);
+}
+
+.mixed {
+  background: var(--metacritic-mixed);
+}
+
+.bad {
+  background: var(--metacritic-bad);
+}
+
+/* Lista de sessões: a mesma caixa dos Detalhes. */
+.lista {
+  padding: var(--space-6);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-card);
+}
+
+.titulo {
+  margin: 0;
+  padding: 14px var(--space-12) var(--space-8);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.sessao {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-12);
+  min-height: 39px;
+  padding: 0 var(--space-12);
+  border-radius: 7px;
+  font-size: 12.5px;
+}
+
+.sessao:nth-child(even) {
+  background: var(--tile);
+}
+
+.inicio {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.duracao {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Liquid Glass (protótipo, `.box`): grupo de vidro. */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .lista {
+  border-color: var(--vidro-group-edge);
+  background: var(--group);
+  box-shadow: var(--vidro-group-shadow);
+  backdrop-filter: var(--vidro-group-blur);
+}

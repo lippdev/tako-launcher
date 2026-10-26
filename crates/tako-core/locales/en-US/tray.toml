@@ -1,0 +1,5 @@
+[tray]
+open = "Open Tako"
+central = "Control Center"
+quit = "Quit Tako"
+tooltip = "Tako"

@@ -1,0 +1,31 @@
+[package]
+name = "tako-sources"
+description = "Fontes de biblioteca do Tako: uma por loja ou launcher, com cfg por SO."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+tako-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+rusqlite.workspace = true
+regex.workspace = true
+plist.workspace = true
+thiserror.workspace = true
+roxmltree.workspace = true
+sha2.workspace = true
+uuid.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-registry.workspace = true
+windows.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

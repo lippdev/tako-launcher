@@ -1,0 +1,345 @@
+---
+version: alpha
+name: Tako Default Theme
+description: |
+  Tema padrão do Tako (MVP-013). Interface de sofá, 10 pés, controlada por joystick.
+  A arte do jogo em foco define a cor da tela inteira: o fundo assume o tom de destaque do jogo
+  e as superfícies são camadas brancas translúcidas sobre ele. Palco de 1080 unidades de altura, com
+  largura na proporção da tela (16:9 = 1920, 21:9 = 2520, 16:10 = 1728), renderizado na resolução física.
+
+colors:
+  # Tom de destaque padrão; em uso real vem do jogo em foco (game.accent).
+  accent: "#C8102E"
+  accent-fallback: "#2B3A55"
+  # Derivados do accent (calculados em runtime, aqui os valores para o fallback vermelho).
+  accent-deep: "#7A0A1C"
+  canvas: "#0E1116"
+  on-accent: "#FFFFFF"
+  on-accent-muted: "#FFFFFFB8"
+  on-accent-subtle: "#FFFFFF80"
+  surface-1: "#FFFFFF1F"
+  surface-2: "#FFFFFF33"
+  surface-sidebar: "#FFFFFF2E"
+  surface-solid: "#FFFFFF"
+  on-surface-solid: "#11141A"
+  # Controles dentro de linhas focáveis (ver Components › Foco): no painel e na linha focada (surface-solid).
+  on-surface-solid-muted: "#565C68"
+  control-knob: "#FFFFFF"
+  control-track-off: "#FFFFFF40"
+  control-off: "#FFFFFF8C"
+  control-on-on-solid: "#0B7A3B"
+  control-off-on-solid: "#5B6170"
+  control-track-on-solid: "#11141A33"
+  value-pill-on-solid: "#11141A1A"
+  focus-ring: "#FFFFFF"
+  scrim: "#00000099"
+  success: "#3DDC84"
+  warning: "#FFB020"
+  error: "#FF5A5F"
+  store-steam: "#1B2838"
+  store-epic: "#2A2A2A"
+  store-gog: "#7A3FD1"
+  store-xbox: "#107C10"
+  store-ubisoft: "#2E3192"
+  store-ea: "#D9302B"
+  store-battlenet: "#0B74DE"
+  store-amazon: "#B35C00"
+  store-manual: "#3D5A80"
+
+typography:
+  display:
+    fontFamily: Source Sans 3
+    fontSize: 84px
+    fontWeight: 300
+    lineHeight: 1.1
+  headline-lg:
+    fontFamily: Source Sans 3
+    fontSize: 64px
+    fontWeight: 300
+    lineHeight: 1.0
+  headline-md:
+    fontFamily: Source Sans 3
+    fontSize: 38px
+    fontWeight: 400
+    lineHeight: 1.15
+  title-md:
+    fontFamily: Inter
+    fontSize: 26px
+    fontWeight: 600
+    lineHeight: 1.2
+  body-lg:
+    fontFamily: Inter
+    fontSize: 26px
+    fontWeight: 400
+    lineHeight: 1.45
+  body-md:
+    fontFamily: Inter
+    fontSize: 22px
+    fontWeight: 400
+    lineHeight: 1.45
+  label-lg:
+    fontFamily: Inter
+    fontSize: 24px
+    fontWeight: 600
+    lineHeight: 1.2
+  label-md:
+    fontFamily: Inter
+    fontSize: 20px
+    fontWeight: 600
+    lineHeight: 1.2
+  label-sm:
+    fontFamily: Inter
+    fontSize: 18px
+    fontWeight: 500
+    lineHeight: 1.25
+  overline:
+    fontFamily: Inter
+    fontSize: 18px
+    fontWeight: 700
+    lineHeight: 1.2
+    letterSpacing: 0.16em
+  glyph:
+    fontFamily: Inter
+    fontSize: 18px
+    fontWeight: 800
+    lineHeight: 1
+
+rounded:
+  sm: 8px
+  md: 14px
+  lg: 22px
+  full: 999px
+
+spacing:
+  xxs: 4px
+  xs: 8px
+  sm: 16px
+  md: 24px
+  lg: 32px
+  xl: 48px
+  xxl: 64px
+  safe-x: 72px
+  safe-y: 48px
+
+motion:
+  focus: 160ms
+  page: 280ms
+  color: 600ms
+  easing: cubic-bezier(0.22, 1, 0.36, 1)
+  focus-scale: 1.08
+
+components:
+  sidebar:
+    backgroundColor: "{colors.surface-sidebar}"
+    width: 400px
+  sidebar-collapsed:
+    width: 120px
+  sidebar-item:
+    textColor: "{colors.on-accent}"
+    typography: "{typography.label-lg}"
+    rounded: "{rounded.md}"
+    height: 64px
+    padding: 20px
+  sidebar-item-selected:
+    backgroundColor: "{colors.surface-solid}"
+    textColor: "{colors.on-surface-solid}"
+  sidebar-item-focused:
+    backgroundColor: "{colors.surface-2}"
+  button-primary:
+    backgroundColor: "{colors.surface-solid}"
+    textColor: "{colors.on-surface-solid}"
+    typography: "{typography.label-lg}"
+    rounded: "{rounded.full}"
+    height: 76px
+    padding: 44px
+  button-secondary:
+    backgroundColor: "{colors.surface-2}"
+    textColor: "{colors.on-accent}"
+    typography: "{typography.label-lg}"
+    rounded: "{rounded.full}"
+    height: 76px
+  game-card:
+    rounded: "{rounded.md}"
+    width: 204px
+    height: 306px
+  game-card-label:
+    textColor: "{colors.on-accent}"
+    typography: "{typography.label-md}"
+  game-card-meta:
+    textColor: "{colors.on-accent-subtle}"
+    typography: "{typography.label-sm}"
+  search:
+    backgroundColor: "{colors.surface-1}"
+    textColor: "{colors.on-accent-muted}"
+    typography: "{typography.label-md}"
+    rounded: "{rounded.full}"
+    height: 60px
+    width: 420px
+  hint-bar:
+    textColor: "{colors.on-accent-muted}"
+    typography: "{typography.label-sm}"
+    height: 88px
+  panel-row-focused:
+    backgroundColor: "{colors.surface-solid}"
+    textColor: "{colors.on-surface-solid}"
+  panel-row-focused-secondary:
+    textColor: "{colors.on-surface-solid-muted}"
+  toggle-on:
+    backgroundColor: "{colors.success}"
+    knobColor: "{colors.control-knob}"
+  toggle-off:
+    backgroundColor: "{colors.control-track-off}"
+    knobColor: "{colors.control-knob}"
+  toggle-on-focused:
+    backgroundColor: "{colors.control-on-on-solid}"
+    knobColor: "{colors.control-knob}"
+  toggle-off-focused:
+    borderColor: "{colors.control-off-on-solid}"
+    knobColor: "{colors.control-off-on-solid}"
+  settings-category:
+    textColor: "{colors.on-accent}"
+    typography: "{typography.label-lg}"
+    rounded: "{rounded.md}"
+    height: 68px
+    width: 340px
+  settings-category-focused:
+    backgroundColor: "{colors.surface-solid}"
+    textColor: "{colors.on-surface-solid}"
+  settings-category-selected:
+    backgroundColor: "{colors.surface-2}"
+  setting-row:
+    backgroundColor: "{colors.surface-1}"
+    textColor: "{colors.on-accent}"
+    typography: "{typography.label-lg}"
+    rounded: "{rounded.lg}"
+    height: 92px
+    padding: 28px
+  setting-value:
+    backgroundColor: "{colors.surface-2}"
+    textColor: "{colors.on-accent}"
+    typography: "{typography.label-md}"
+    rounded: "{rounded.full}"
+  feature-card:
+    backgroundColor: "{colors.surface-1}"
+    textColor: "{colors.on-accent}"
+    typography: "{typography.title-md}"
+    rounded: "{rounded.lg}"
+    width: 420px
+    height: 208px
+  state-badge-on:
+    backgroundColor: "{colors.success}"
+    typography: "{typography.label-sm}"
+    rounded: "{rounded.full}"
+  state-badge-setup:
+    backgroundColor: "{colors.warning}"
+  state-badge-problem:
+    backgroundColor: "{colors.error}"
+  state-badge-off:
+    backgroundColor: "{colors.surface-2}"
+  glyph-button:
+    backgroundColor: "{colors.surface-solid}"
+    textColor: "{colors.on-surface-solid}"
+    typography: "{typography.glyph}"
+    rounded: "{rounded.full}"
+    size: 34px
+---
+
+# Tako — tema padrão
+
+## Overview
+
+Launcher de jogos para TV e handheld, usado do sofá com controle. A referência visual é uma biblioteca estilo "app de mídia": barra lateral com a organização da biblioteca, um destaque grande com o jogo atual e fileiras de capas. A tela inteira assume a cor do jogo em foco, como se a arte "vazasse" para a interface.
+
+Princípios:
+
+- **Controle primeiro.** Todo elemento interativo é alcançável pelo direcional/analógico, e sempre existe exatamente um elemento em foco, visível de longe.
+- **A arte é a protagonista.** O chrome é branco translúcido sobre o tom do jogo; nenhuma cor de marca compete com a capa.
+- **Legível a 3 metros.** Nenhum texto abaixo de 18px no canvas de 1080p.
+- **Implementável em WPF.** Só usar efeitos que o WPF reproduz sem custo alto (ver Do's and Don'ts).
+
+## Colors
+
+- **Accent (dinâmico):** cada jogo tem um `accent` extraído da arte (cor dominante saturada, pré-calculada na importação). O fundo é um gradiente de `accent` (topo-esquerda) para `accent-deep` (base). Ao trocar o foco, a cor anima em `motion.color`.
+- **accent-deep:** o accent escurecido ~45% em luminância. Garante contraste do texto branco na metade de baixo.
+- **Fallback (#2B3A55):** azul-ardósia para jogos sem arte ou com cor dominante pouco saturada.
+- **Superfícies:** brancos com alpha (`surface-1` 12%, `surface-2` 20%, `surface-sidebar` 18%). Funcionam sobre qualquer accent.
+- **Surface solid / on-surface-solid:** branco opaco com texto escuro, reservado à ação principal da tela (Jogar), ao item ativo da barra lateral e ao item focado de listas e painéis (linha de painel, categoria, tecla). Tudo que fica dentro dele usa as cores "sobre superfície sólida" (`on-surface-solid`, `on-surface-solid-muted`, `control-*-on-solid`; ver Components › Foco).
+- **Contraste:** se o accent tiver luminância relativa > 0.35, escurecer até atingir 4.5:1 com branco antes de usar como fundo.
+
+## Typography
+
+Títulos (`display`, `headline-*`) em Source Sans 3 leve, humanista da linha Frutiger como a SST do PS5; o restante em Inter. Ambas SIL OFL, empacotadas com o app. **Todo texto usa um token da escala acima**; nenhum tamanho avulso.
+
+- **Título de jogo:** sempre `display` (84px, peso 300), em qualquer tela (destaque, detalhes, jogando), ocupando a largura disponível, com no máximo duas linhas. O tamanho não varia com o comprimento do nome. O bloco do destaque é ancorado embaixo, então um título de duas linhas cresce para cima e os botões nunca mudam de posição.
+- **Descrição:** no máximo 3 linhas (`body-lg`).
+- **Datas:** dd/mm/aaaa.
+
+ Títulos de jogo usam `display` em todas as telas, peso 800, com tracking negativo, fazendo o papel do logo do jogo quando não há arte de logo. `overline` (caixa alta, tracking largo) marca contexto: "CONTINUAR JOGANDO", "INSTALADO".
+
+## Layout
+
+- **Palco:** 1080 de altura; a largura segue a proporção da tela (mínimo 4:3, máximo 32:9), então não há faixas pretas. Texto e vetores saem na resolução física (DPI por monitor) e as imagens são decodificadas na mesma densidade (capas 600x900 e fundos 3840 de largura em 4K). Área segura: `safe-x` 72px e `safe-y` 48px (overscan de TV).
+- **Barra lateral:** 400px quando em foco; recolhe para 120px (só ícones) quando o foco vai para o conteúdo, liberando espaço para o destaque.
+- **Conteúdo:** cabeçalho (título da página + busca), destaque (hero) ocupando ~55% da altura e fileiras horizontais de capas.
+- **Início:** a primeira fileira é sempre **Jogados recentemente** (só jogos já jogados, do mais recente ao mais antigo), e o destaque abre no último jogado ("Continuar jogando"). Ao fim de uma sessão, o jogo volta para o primeiro lugar e a fileira volta ao início.
+- **Barra de dicas:** rodapé fixo com os glifos do controle e a ação de cada botão na tela atual. Sem largura (4:3, 16:10, escala alta, teclado), primeiro abrevia ("Configurações" → "Ajustes", menos espaço entre as dicas) e depois esconde as menos importantes (seção, busca); A e B ficam sempre. Nunca corta uma dica no meio.
+- **Listas que rolam com o foco:** o item focado fica inteiro entre o cabeçalho e a barra de dicas, com folga (o anel de foco não encosta na moldura). Listas que não começam no topo da tela rolam numa moldura com recorte que termina acima da barra de dicas.
+- **Painéis laterais e diálogos:** reservam a altura da barra de dicas (88, `HintBarReserve`). O fundo do painel vai até a base da tela, mas a lista rola numa moldura que termina acima da barra, então nenhuma linha (focada ou não) aparece por baixo das dicas; os diálogos centralizam na área acima dela.
+- **Cabeçalho fixo:** título da página, busca e status não rolam. O conteúdo rola numa moldura que esmaece antes do cabeçalho e antes da barra de dicas, então nada passa por trás desses textos.
+- **Status do sistema:** canto superior direito, acima da busca: entrada atual (ícone de controle com o nome, ou teclado) e a hora. Aparece em todas as telas.
+- **Grade da biblioteca:** capas 2:3 (204x306), 7 colunas quando a barra lateral está recolhida. O fundo e o accent acompanham a capa em foco, como na Início.
+
+## Elevation & Depth
+
+Profundidade vem de camadas de branco translúcido e de escala, não de sombra. A única sombra é a do elemento em foco (sombra preta 40%, blur 32px, deslocamento 16px), uma por vez. O hero usa gradientes de escurecimento (scrim) sobre a arte para destacar o texto.
+
+## Shapes
+
+Capas com `rounded.md` (14px); botões e busca em pílula (`full`); itens da barra lateral em `md`. Nada de cantos vivos.
+
+## Components
+
+- **Foco:** anel branco de 4px afastado 6px do elemento, escala `motion.focus-scale` em capas, transição `motion.focus`. Itens de lista não escalam: ganham fundo `surface-2` (linhas de Configurações, cartões) ou viram a superfície sólida branca (linhas de painel — filtros, Configurações deste jogo, painéis da Central —, categorias, teclas).
+  - **Controles na linha focada (MVP-029, UX-009):** numa linha branca, nada pode ser branco. Chave ligada: trilho `control-on-on-solid` (verde escuro) com bolinha branca; desligada: trilho contornado e bolinha em `control-off-on-solid`. Marcador (○/◉): contorno `control-off-on-solid`, escolhido em `on-surface-solid`. Título, seta, ícones e valor em destaque em `on-surface-solid`; contagem e valor secundário em `on-surface-solid-muted` (nunca por opacidade); valor positivo (bateria) em `control-on-on-solid`; pílula de valor em `value-pill-on-solid`; trilho da barra de volume em `control-track-on-solid`. Fora do foco, os mesmos controles usam `success`, `control-track-off`, `control-off` e `on-accent-muted`.
+  - **Contraste:** WCAG AA — texto 4.5:1 (texto grande, 24px ou 18.66px em negrito, 3:1), componentes 3:1 contra o fundo em que estão. Implementação: a linha marca `FocusSurface.IsSolid` (herdado) e os estilos `ToggleVisual`, `RadioVisual`, `RowEndText`, `RowIcon`, `ValuePill` e `SliderTrack` trocam de cor sozinhos. Os testes conferem os tokens e, a cada captura do teste de fumaça, as cores reais do item focado.
+- **Game card:** capa 2:3, nome (`label-md`, uma linha com reticências) e loja + tamanho (`label-sm`) abaixo. Em foco, só a capa escala; o texto não se move. O destaque da Home troca para o jogo.
+- **Fileiras:** o item em foco fica ancorado na primeira posição e a fileira rola por baixo dele, até o fim da lista.
+- **Botão primário (Jogar):** pílula branca com ícone de play. Um por tela.
+- **Barra de dicas:** glifos A/B/X/Y/LB/RB/Menu desenhados como círculos brancos com a letra; troca para teclas (Enter, Esc...) quando a última entrada foi teclado.
+- **Menu rápido (Central de Controle):** aberto durante o jogo pelo atalho da Central (ver **Atalho da Central** abaixo), no padrão da Central de Controle do PS5. Diferente do PS5, fica no **topo**: o jogo continua visível, escurecido de cima para baixo, e a hora e o controle descem para o canto inferior esquerdo enquanto o menu está aberto.
+  - **Atalho da Central (UX-005):** no controle, **segurar View + Y por meio segundo** (Create + △ no DualSense, Share + △ no DualShock 4). Segurar, e não só apertar junto, evita abrir sem querer no meio do jogo (como o Console Mode); o mesmo gesto fecha. Com o View pressionado, o Y não abre a busca. O Guia/PS deixou de ser o padrão porque abre a Barra de Jogo do Xbox e a Steam junto. No teclado, **Ctrl+Shift+Tab** (o Shift+Tab é da Steam e do GOG Galaxy; o Ctrl+Shift+O, sugerido de início, é o painel de métricas do AMD Adrenalin). Durante um jogo real o atalho de teclado é global (funciona com o jogo na frente); fora dele, só com o Tako na frente. Os dois mudam em Configurações › "Abrir a Central de Controle no controle/teclado", com telas de captura ("Segure os botões que quer usar", vale a combinação que fica igual por 1 s, tocar B cancela; "Aperte as teclas que quer usar", Esc cancela) e "Restaurar atalhos padrão". Regras: nenhuma combinação serve a duas ações do Tako (a do controle precisa incluir View ou Guia/PS, que não navegam; no máximo 3 botões; a do teclado precisa de Ctrl ou Alt e não pode repetir o atalho de emergência do modo console); atalhos do Windows (Alt+Tab, Alt+F4, Win+…, Ctrl+Shift+Esc) são recusados; conflitos conhecidos (Steam, NVIDIA Alt+Z/Alt+R/Alt+F1, AMD Ctrl+Shift+O/E/S/R/I/G/M/C/L, EA/Ubisoft/Epic Shift+F1/F2/F3, Alt+Enter dos jogos, AltGr do ABNT2) são aceitos com aviso. As dicas de botões mostram a combinação configurada.
+  - **Ao vivo sobre o jogo (como a sobreposição da Steam):** com o jogo em janela ou em tela cheia sem bordas, a Central abre na própria janela do Tako, transparente, sempre no topo e do tamanho do monitor do jogo; só a camada do Tako escurece um pouco (sem desfoque: desfocar exigiria o acrílico do DWM sobre o monitor inteiro e esconderia o jogo). O jogo continua visível e rodando atrás. Fechar (B, o atalho ou "Voltar ao jogo") tira a janela de cima e devolve o foco ao jogo. **Em tela cheia exclusiva** uma janela por cima minimiza o jogo; lá o Tako vem para a frente com a Central sobre a arte do jogo, como antes (detectado pelo Windows, `SHQueryUserNotificationState`). Aberta de dentro do Tako (jogo atrás da Início), a Central também usa a arte.
+  - **Foco e entrada com o jogo atrás:** a Central precisa do foco do teclado, então a janela do jogo perde o foco enquanto ela está aberta; muitos jogos pausam ou abaixam o som ao perder o foco. Alguns jogos continuam lendo o controle em segundo plano (XInput e HID são lidos por qualquer programa) e reagem aos botões usados na Central; o Tako não tem como bloquear isso, como a Steam Input faz ao virtualizar o controle. Se um jogo reagir, pause o jogo antes de abrir a Central.
+  - **Cartões vivos** (fileira abaixo da barra): Jogo (arte, tempo de sessão, total), Capturas (última captura ou convite), Desempenho do PC (uso de CPU grande, gráfico dos últimos segundos, GPU e RAM; lidos do Windows a cada segundo), Áudio (volume e saída) e Controle (bateria). O cartão do jogo é maior e recebe o foco ao abrir.
+  - **Janelas abertas** (fileira abaixo dos cartões, o "Alt+Tab" do controle): as janelas que o Alt+Tab listaria. Cartão de 300 × 164 com linhas de altura fixa: ícone do programa (40), título em até 2 linhas com reticências e nome do programa embaixo; nada se sobrepõe, com qualquer título. O título da fileira mostra a contagem ("JANELAS ABERTAS · 7"). A alterna para a janela (o jogo continua aberto); X pede para ela fechar, como o X da janela.
+  - **Rolagem das fileiras da Central:** diferente das fileiras da biblioteca, anda só o necessário para o cartão focado caber **inteiro** na tela, com folga nas bordas; as bordas da fileira esmaecem (56 unidades), mostrando que ela continua. Vale em qualquer proporção (16:9, 21:9, 4:3) e resolução: o palco tem 1080 unidades de altura e é escalado inteiro, então 1080p, 1440p, 4K e escalas de 100% a 200% do Windows têm o mesmo layout.
+  - **Barra de ícones** (no topo, centralizada): Início, o jogo (capa com ponto verde), Capturar, Desempenho, Áudio, Controle, Tela, Ponteiro, ControlFS, Encerrar. O ícone em foco vira círculo branco e mostra o nome abaixo.
+  - **Painel do ícone** (melhoria sobre o PS5, que troca de tela): A abre um painel de 600px logo abaixo da barra, alinhado ao ícone, com linhas grandes (marcador redondo, chave liga/desliga, barra de volume). O ícone de origem fica marcado e os cartões saem de cena (nunca dois painéis sobrepostos). B fecha o painel; o painel de Encerrar já é a confirmação.
+  - **Painéis e opções:** com um painel aberto, ← → levam o painel ao ícone vizinho (Desempenho, Áudio, Controle, Tela, Ponteiro, ControlFS); ícones sem painel só recebem o foco, e Encerrar nunca abre deslizando. Escolher uma opção aplica na hora, confirma com um aviso e fecha o painel, com o foco de volta no ícone. No volume, ← → ajustam. Linhas de valor (estilo e posição do contador de FPS, limite de FPS) e chaves (ponteiro) mudam sem fechar o painel: A avança, ← → ajustam.
+  - **Navegação:** ← → ficam na fileira atual; ↑ de um cartão vai ao ícone correspondente e ↓ volta ao cartão. B ou o atalho da Central voltam ao jogo. "Início" volta ao launcher sem fechar o jogo (o status mostra o jogo em execução e o atalho retorna a ele).
+- **Contador de FPS:** próprio, sem RTSS e sem injeção (ADR-0017): o PresentMon mede pelo Windows e o Tako desenha uma janela transparente que não recebe clique nem foco, no canto escolhido do monitor do jogo. Estilos Desligado, Só FPS (padrão), Compacto e Detalhado (tempo de quadro, 1% low, API, CPU/GPU/memória); posição, tamanho e fundo escuro. Ligado em Modo Console › Contador de FPS › Mostrar FPS, só com teclado e mouse (o UAC da permissão não aceita controle; com controle a linha esmaece e diz "Use teclado e mouse para ativar"). Sem o contador pronto, as opções de FPS na Central ficam esmaecidas com o caminho para ligar. Em tela cheia exclusiva o contador não aparece sobre o jogo; o FPS continua na Central.
+- **Limite de FPS:** pelo driver de vídeo (NVIDIA, AMD ou Intel, ADR-0018), independente do contador. O valor do usuário volta ao sair do jogo.
+- **Ponteiro:** esconder o ponteiro e movê-lo com o analógico (esquerdo move, direito rola, A clica, A duas vezes = botão direito, segurar A = arrastar), pausado enquanto a Central está aberta; tudo volta ao normal no fim da sessão.
+- **Restrição técnica do menu rápido:** sem injeção gráfica (proibida pelo PRD, §10), a sobreposição é a janela do Tako transparente e topmost (composição do DWM, sem `AllowsTransparency`); ela funciona sobre jogos em janela e em tela cheia sem bordas, mas não sobre tela cheia exclusiva, onde a Central abre com a arte do jogo. Validar no Windows (checklist §11) antes de prometer o comportamento.
+- **Ações rápidas do jogo (UX-005):** ☰ (Options no PS, M no teclado) com o foco numa capa abre um diálogo com Jogar, Favoritar, Adicionar à coleção, Configurações deste jogo e Detalhes; a dica do rodapé troca de "Configurações" para "Ações". Fora de uma capa, ☰ continua abrindo as Configurações. Um diálogo que abre outro devolve o foco à capa de origem ao fechar a cadeia.
+- **Coleções (UX-003):** cada coleção com jogos vira uma fileira na Início (entre "Jogados recentemente" e "Adicionados recentemente"), com "Ver todos" que abre a biblioteca filtrada, e uma seção "Coleção" no painel de filtros. Pôr e tirar jogos: diálogo com as coleções (✓ = o jogo está nela), que continua aberto para marcar várias. Nomes pelo teclado virtual da busca, com título e dica próprios e a regra do nome na linha de baixo; B cancela.
+- **Painel lateral de opções:** o mesmo dos filtros (à direita, na altura da tela, linhas com o valor no fim, a página visível atrás; 760px quando os valores são longos). Em "Configurações deste jogo" (UX-007) cada linha começa em "Padrão: <valor do Tako>" em opacidade reduzida; o que o jogo muda aparece em negrito. A troca o valor e salva na hora; "Usar tudo do Tako" volta tudo ao padrão.
+- **Configurações (UX-006/009, ADR-0020):** como num console. Título da página no topo; à esquerda, a coluna de categorias (`settings-category`, 340px: ícone e nome; a escolhida fica com `surface-2`, a focada branca com texto escuro); à direita, o nome e uma frase da categoria e as linhas dela. Focar uma categoria já mostra o conteúdo; → ou A entram na primeira linha; LB/RB (Q/E) trocam de categoria e a dica do rodapé diz "Categoria"; B no conteúdo volta à categoria e B na coluna sai. Categorias: Geral, Biblioteca e lojas, Aparência, Controles, Sistema e Sobre. "Opções de desenvolvedor" (em Sistema, desligadas) escondem as ferramentas de tema.
+  - **Linha (`setting-row`):** título (`label-lg`) e descrição em até duas linhas (`label-sm`, `on-accent-muted`); à direita, a chave liga/desliga, ou o valor numa pílula (`setting-value`) com seta (abre algo) ou com ⇄ (A troca o valor), ou só a pílula (informação). Grupos dentro da categoria com título `overline`. Linha que precisa de teclado e mouse fica a 45% de opacidade e explica ao ser ativada.
+  - **Legibilidade:** a página escurece a arte do jogo da esquerda (88%) para a direita (70%); nenhum texto fica direto sobre a arte.
+- **Modo Console (ADR-0020):** item próprio na barra lateral (acima de Configurações), com tudo que veio do Console Mode. Título, uma frase e o botão primário "Configurar para jogar na TV"; abaixo, um **cartão de recurso** (`feature-card`, 420×208: ícone, selo de estado no canto, nome em `title-md` e uma linha de resumo) para Tela de jogo, TV, Áudio do jogo, Steam na bandeja, Contador de FPS e Limite de FPS. Selos: Ligado (`success`), Falta configurar (`warning`), Com problema (`error`), Desligado (`surface-2`). A abre o detalhe: o cartão vira cabeçalho (ícone, nome, selo e resumo) e as linhas do recurso seguem o componente de linha; B volta ao cartão.
+  - **Assistente:** diálogo largo (1000px) com o nome do assistente em `overline`, a barra de passos (Tela, Imagem, TV, Áudio, Pronto: o atual em branco, os feitos em verde), "Passo N de 5", título, texto e as escolhas do passo como pílulas (a sugerida é a primária e recebe o foco). B volta um passo; cada passo salva na hora e pode ser pulado.
+- **Campo de segredo:** senhas e chaves (Client Secret da IGDB, senha do ScreenScraper) aparecem como ● ; o botão "Mostrar"/"Ocultar" ao lado alterna o texto. Colar e digitar funcionam como nos outros campos.
+- **Sair para o desktop:** sempre presente no fim da barra lateral (princípio "recovery-first" do PRD).
+
+## Do's and Don'ts
+
+- Do manter exatamente um elemento em foco e restaurar o foco anterior ao voltar (B).
+- Do lembrar a posição em cada fileira ao sair e voltar para ela.
+- Do usar transform (escala/translação), opacidade e animação de cor: são baratos no WPF.
+- Don't usar blur de fundo (`backdrop-filter`) ou vidro fosco: o WPF não tem equivalente nativo e o custo em GPU é alto.
+- Don't usar sombra em listas inteiras; só no item em foco.
+- Don't depender de hover ou de mouse para qualquer ação.
+- Do aceitar mouse em tudo como alternativa: passar o mouse foca sem rolar a tela, clicar ativa, a roda navega, as dicas do rodapé são clicáveis, clicar fora fecha o painel (ou o menu) e a barra de volume aceita clique e arraste.
+- Don't versionar arte de jogos no repositório (é protegida por direitos autorais): o app baixa capas e heros das lojas para um cache local, e o protótipo as carrega direto dos CDNs.
+- Do ter fallback quando não há arte: gradiente do accent com o título do jogo.

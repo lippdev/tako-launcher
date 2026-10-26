@@ -1,0 +1,3 @@
+/* Diagnóstico, sem representar uma tela de produto. A barra usa regiões nativas do CEF Views. */
+header { -webkit-app-region: drag; user-select: none; }
+button, input { -webkit-app-region: no-drag; }

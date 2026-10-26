@@ -1,0 +1,67 @@
+.range {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+
+/* Área de toque de 24 de altura; o trilho de 4 fica no meio. */
+.hit {
+  position: relative;
+  flex: none;
+  width: var(--slider-width);
+  height: var(--slider-hit-height);
+  cursor: pointer;
+  touch-action: none;
+}
+
+.hit[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.track {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: var(--slider-track-height);
+  margin-top: calc(var(--slider-track-height) / -2);
+  overflow: hidden;
+  border-radius: var(--slider-track-height);
+  background: var(--control-track);
+}
+
+/* A parte cheia é a barra inteira deslocada para a esquerda, só por transform: a ponta direita fica no centro da
+   bolinha (metade da bolinha mais --p do curso dela). */
+.fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--primary);
+  transform: translateX(
+    calc(var(--slider-thumb) / 2 + var(--p) * (var(--slider-width) - var(--slider-thumb)) - var(--slider-width))
+  );
+}
+
+.thumb {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: var(--slider-thumb);
+  height: var(--slider-thumb);
+  margin-top: calc(var(--slider-thumb) / -2);
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: var(--thumb-shadow);
+  transform: translateX(calc(var(--p) * (var(--slider-width) - var(--slider-thumb))));
+}
+
+.value {
+  min-width: var(--slider-value-width);
+  text-align: right;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}

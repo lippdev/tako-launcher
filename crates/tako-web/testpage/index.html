@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Tako — WEB-02a</title>
+  <link rel="stylesheet" href="test.css">
+  <script src="test.js" defer></script>
+</head>
+<body>
+  <header id="titlebar"><span data-text="title"></span></header>
+  <nav>
+    <button data-action="minimize" data-text="minimize"></button>
+    <button data-action="toggle_maximize" data-text="maximize"></button>
+    <button data-action="close" data-text="close"></button>
+  </nav>
+  <p data-text="instructions"></p>
+  <label><span data-text="state"></span> <input id="state" value="library/steam:570"></label>
+  <button id="save" data-text="save"></button>
+  <button id="read" data-text="read"></button>
+  <button id="window-test" data-text="windowTest"></button>
+  <button id="scan" data-text="scan"></button>
+  <a href="https://example.org/" data-text="external"></a>
+  <button id="dialogs" data-text="dialogs"></button>
+  <pre id="output" role="status"></pre>
+  <img id="cover" src="tako-img://cover?id=test%3Acover&amp;w=120&amp;h=180" alt="">
+  <script src="locales/pt-BR.js"></script>
+</body>
+</html>

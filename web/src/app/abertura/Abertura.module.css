@@ -1,0 +1,6 @@
+/* O fundo da janela enquanto o núcleo responde: sem nada piscando antes da abertura. */
+.fundo {
+  position: fixed;
+  inset: 0;
+  background: var(--canvas);
+}

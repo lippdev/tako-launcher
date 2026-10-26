@@ -1,0 +1,51 @@
+[presentation]
+store.manual = "Added"
+store.emulators = "Emulators"
+store_of.emulators = "from emulators"
+store_via.emulators = "via the emulator"
+store_of.masculine = "from {store}"
+store_of.feminine = "from {store}"
+store_via.masculine = "via {store}"
+store_via.feminine = "via {store}"
+store_in.emulators = "in the emulator"
+store_in.masculine = "on {store}"
+store_in.feminine = "on {store}"
+
+[presentation.last_played]
+never = "Never played"
+now = "Just now"
+yesterday = "Played yesterday"
+days.one = "{n} day ago"
+days.other = "{n} days ago"
+weeks.one = "{n} week ago"
+weeks.other = "{n} weeks ago"
+months.one = "{n} month ago"
+months.other = "{n} months ago"
+
+[presentation.play_time]
+minutes = "{n} min"
+hours = "{n} h"
+
+[presentation.session]
+less_than_minute = "less than 1 min played"
+minutes.one = "{n} min played"
+minutes.other = "{n} min played"
+hours = "{h} h played"
+hours_minutes = "{h} h {m} min played"
+
+[presentation.date]
+long = "%m/%d/%Y"
+short = "%m/%d"
+
+[presentation.status]
+upcoming = "Releases on {date}"
+rom = "ROM on disk"
+rom_missing = "ROM not found"
+installed = "Installed"
+not_installed = "Not installed"
+
+[presentation.keyboard]
+backspace = "Delete"
+space = "Space"
+clear = "Clear"
+done = "Done"

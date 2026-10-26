@@ -1,0 +1,1015 @@
+// Tema padrão do Tako (DESIGN.md). Este arquivo é a API de tema v1: o componente `App` e as structs
+// exportadas são o contrato com o Tako (PRD §7). O Tako calcula o estado e o foco; o tema só desenha
+// e avisa cliques e teclas. Outros temas podem importar estes arquivos e trocar só a aparência.
+
+import "fonts/Inter-Regular.ttf";
+import "fonts/Inter-Medium.ttf";
+import "fonts/Inter-SemiBold.ttf";
+import "fonts/Inter-Bold.ttf";
+import "fonts/Inter-ExtraBold.ttf";
+import "fonts/SourceSans3-Light.ttf";
+import "fonts/SourceSans3-Regular.ttf";
+import "fonts/SourceSans3-Semibold.ttf";
+import "fonts/SourceSans3-Bold.ttf";
+import "fonts/Poppins-Regular.ttf";
+import "fonts/Poppins-Medium.ttf";
+import "fonts/Poppins-SemiBold.ttf";
+import "fonts/Poppins-Bold.ttf";
+import "fonts/Poppins-ExtraBold.ttf";
+import "fonts/PlusJakartaSans-Regular.ttf";
+import "fonts/PlusJakartaSans-Medium.ttf";
+import "fonts/PlusJakartaSans-SemiBold.ttf";
+import "fonts/PlusJakartaSans-Bold.ttf";
+import "fonts/PlusJakartaSans-ExtraBold.ttf";
+
+import { Ui } from "tokens.slint";
+import { Icons } from "icons.slint";
+import { Hint, PanelRow, Icon, Glyph, HintBar, Pill, Toggle, RowView } from "widgets.slint";
+import { Tile, Key, Overlay, Overline, RowList, OverlayView } from "overlay.slint";
+
+export { Ui, Hint, PanelRow, Tile, Key, Overlay }
+
+export struct HomeRow { title: string, count: string, tiles: [Tile], see-all: bool }
+
+export struct NavItem { id: string, label: string, icon: string, count: string, section: string, selected: bool }
+
+export struct Hero {
+    has-game: bool,
+    title: string,
+    overline: string,
+    meta: string,
+    description: string,
+    art: image,
+    logo: image,
+    play-label: string,
+    running: bool,
+}
+
+export struct Stat { label: string, value: string }
+
+export struct Details {
+    title: string,
+    overline: string,
+    meta: string,
+    description: string,
+    art: image,
+    cover: image,
+    logo: image,
+    hint: string,
+}
+
+component Backdrop inherits Rectangle {
+    in property <image> art;
+    in property <bool> dim-left;
+    background: @linear-gradient(160deg, Ui.accent 0%, Ui.accent-deep 100%);
+    animate background { duration: Ui.color-time; }
+    if Ui.has-custom-background && Ui.custom-background.width > 0: Image {
+        width: parent.width;
+        height: parent.height;
+        source: Ui.custom-background;
+        image-fit: cover;
+        opacity: Ui.custom-background-opacity;
+    }
+    if Ui.has-custom-background && Ui.custom-background.width > 0: Rectangle {
+        background: Ui.custom-background-scrim;
+    }
+    if !Ui.has-custom-background && art.width > 0: Image {
+        width: parent.width;
+        height: parent.height;
+        source: art;
+        image-fit: cover;
+        opacity: 0.55;
+    }
+    // Escurece para o texto ficar legível (o fundo é a arte do jogo em foco).
+    Rectangle { background: @linear-gradient(90deg, Ui.accent-deep.with-alpha(dim-left ? 0.88 : 0.75) 0%, Ui.accent-deep.with-alpha(dim-left ? 0.7 : 0.15) 100%); }
+    Rectangle { background: @linear-gradient(180deg, transparent 40%, Ui.accent-deep.with-alpha(0.9) 100%); }
+}
+
+component GameCard inherits Rectangle {
+    in property <Tile> tile;
+    in property <bool> focused;
+    in property <bool> show-label: true;
+    callback clicked();
+    callback hovered();
+    width: 204 * Ui.u;
+    height: show-label ? 306 * Ui.u + 64 * Ui.u : 306 * Ui.u;
+    art-box := Rectangle {
+        y: 0;
+        width: parent.width;
+        height: 306 * Ui.u;
+        property <float> s: focused ? 1.08 : 1;
+        animate s { duration: Ui.focus-time; easing: cubic-bezier(0.22, 1, 0.36, 1); }
+        Rectangle {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: parent.width * art-box.s;
+            height: parent.height * art-box.s;
+            border-radius: Ui.radius-md;
+            clip: true;
+            background: @linear-gradient(160deg, tile.accent 0%, tile.accent.darker(0.5) 100%);
+            drop-shadow-blur: focused ? 32 * Ui.u : 0;
+            drop-shadow-offset-y: focused ? 16 * Ui.u : 0;
+            drop-shadow-color: #00000066;
+            if tile.cover.width == 0: Text {
+                x: 16 * Ui.u;
+                width: parent.width - 32 * Ui.u;
+                text: tile.title;
+                color: Ui.on-accent;
+                font-family: Ui.font-title;
+                font-weight: 700;
+                font-size: 30 * Ui.u;
+                wrap: word-wrap;
+                vertical-alignment: center;
+                horizontal-alignment: center;
+            }
+            Image { width: parent.width; height: parent.height; source: tile.cover; image-fit: cover; }
+            if tile.running: Rectangle {
+                x: parent.width - 30 * Ui.u;
+                y: 14 * Ui.u;
+                width: 16 * Ui.u;
+                height: 16 * Ui.u;
+                border-radius: 8 * Ui.u;
+                background: Ui.success;
+            }
+            if tile.favorite: Icon { x: 12 * Ui.u; y: 12 * Ui.u; name: "starfill"; tint: #FFFFFF; size: 26 * Ui.u; }
+        }
+        if focused: Rectangle {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: parent.width * art-box.s + 20 * Ui.u;
+            height: parent.height * art-box.s + 20 * Ui.u;
+            border-radius: Ui.radius-md + 10 * Ui.u;
+            border-width: 4 * Ui.u;
+            border-color: Ui.surface-solid;
+        }
+    }
+    if show-label: VerticalLayout {
+        y: 306 * Ui.u + 20 * Ui.u;
+        width: parent.width;
+        spacing: 2 * Ui.u;
+        Text { text: tile.title; color: Ui.on-accent; font-size: Ui.label-md; font-weight: 600; font-family: Ui.font-text; overflow: elide; }
+        Text { text: tile.meta; color: Ui.on-accent-subtle; font-size: Ui.label-sm; font-weight: 500; font-family: Ui.font-text; overflow: elide; }
+    }
+    TouchArea {
+        clicked => { root.clicked(); }
+        changed has-hover => { if (self.has-hover) { root.hovered(); } }
+    }
+}
+
+component Sidebar inherits Rectangle {
+    in property <[NavItem]> items;
+    in property <int> sel;
+    in property <bool> expanded;
+    callback clicked(int);
+    callback hovered(int);
+    width: expanded ? 400 * Ui.u : 120 * Ui.u;
+    animate width { duration: Ui.page-time; easing: cubic-bezier(0.22, 1, 0.36, 1); }
+    background: Ui.surface-sidebar;
+    clip: true;
+    VerticalLayout {
+        padding-top: 40 * Ui.u;
+        padding-left: 28 * Ui.u;
+        padding-right: 28 * Ui.u;
+        padding-bottom: Ui.hint-bar;
+        spacing: 6 * Ui.u;
+        Image { source: @image-url("tako-mark.png"); height: 64 * Ui.u; width: 64 * Ui.u; image-fit: contain; }
+        Rectangle { height: 24 * Ui.u; }
+        for it[i] in items: VerticalLayout {
+            spacing: 6 * Ui.u;
+            if it.section != "" && expanded: Text {
+                text: it.section;
+                color: Ui.on-accent-subtle;
+                font-size: Ui.label-sm;
+                font-weight: 700;
+                letter-spacing: 0.16 * Ui.label-sm;
+                font-family: Ui.font-text;
+                height: 44 * Ui.u;
+                vertical-alignment: bottom;
+            }
+            if it.id == "spacer": Rectangle { vertical-stretch: 1; }
+            if it.id != "spacer": Rectangle {
+                property <bool> solid: it.selected && !(i == sel);
+                height: 64 * Ui.u;
+                border-radius: Ui.radius-md;
+                background: i == sel ? Ui.surface-solid : (it.selected ? Ui.surface-2 : transparent);
+                animate background { duration: Ui.focus-time; }
+                HorizontalLayout {
+                    padding-left: 20 * Ui.u;
+                    padding-right: 20 * Ui.u;
+                    spacing: 18 * Ui.u;
+                    Icon { name: it.icon; y: (parent.height - self.height) / 2; tint: i == sel ? Ui.on-surface-solid : Ui.on-accent; }
+                    if expanded: Text {
+                        text: it.label;
+                        color: i == sel ? Ui.on-surface-solid : Ui.on-accent;
+                        font-size: Ui.label-lg;
+                        font-weight: 600;
+                        font-family: Ui.font-text;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                        overflow: elide;
+                    }
+                    if expanded && it.count != "": Text {
+                        text: it.count;
+                        color: i == sel ? Ui.on-surface-solid-muted : Ui.on-accent-subtle;
+                        font-size: Ui.label-md;
+                        font-family: Ui.font-text;
+                        vertical-alignment: center;
+                    }
+                }
+                TouchArea {
+                    clicked => { root.clicked(i); }
+                    changed has-hover => { if (self.has-hover) { root.hovered(i); } }
+                }
+            }
+        }
+    }
+}
+
+component StatusCorner inherits HorizontalLayout {
+    in property <string> clock;
+    in property <string> input-label;
+    in property <string> input-icon;
+    in property <string> pad-battery;
+    spacing: 16 * Ui.u;
+    alignment: end;
+    Icon { name: input-icon; tint: Ui.on-accent-muted; y: (parent.height - self.height) / 2; }
+    if input-label != "": Text { text: input-label; color: Ui.on-accent-muted; font-size: Ui.label-md; font-family: Ui.font-text; vertical-alignment: center; }
+    if pad-battery != "": Icon { name: "battery"; tint: Ui.on-accent-muted; y: (parent.height - self.height) / 2; }
+    if pad-battery != "": Text { text: pad-battery; color: Ui.on-accent-muted; font-size: Ui.label-md; font-family: Ui.font-text; vertical-alignment: center; }
+    Text { text: clock; color: Ui.on-accent; font-size: Ui.label-lg; font-weight: 600; font-family: Ui.font-text; vertical-alignment: center; }
+}
+
+component GameTitle inherits Text {
+    color: Ui.on-accent;
+    font-family: Ui.font-title;
+    font-size: Ui.display;
+    font-weight: 800;
+    letter-spacing: -0.02 * Ui.display;
+    wrap: word-wrap;
+    overflow: elide;
+    max-height: 2 * 1.1 * Ui.display;
+}
+
+// Fileira de capas: o item focado fica ancorado na primeira posição e a fileira rola por baixo dele.
+component GameRow inherits Rectangle {
+    in property <HomeRow> data;
+    in property <int> sel;
+    in property <string> see-all-label;
+    callback clicked(int);
+    callback hovered(int);
+    property <length> step: 230 * Ui.u;
+    // A âncora só segue o foco do teclado/controle; o mouse por cima não rola a fileira.
+    property <int> anchor;
+    init => { anchor = max(0, sel); }
+    changed sel => { if (!Ui.pointer) { anchor = max(0, sel); } }
+    height: 60 * Ui.u + 370 * Ui.u + 40 * Ui.u;
+    HorizontalLayout {
+        y: 0;
+        height: 44 * Ui.u;
+        padding-left: 64 * Ui.u;
+        spacing: 18 * Ui.u;
+        alignment: start;
+        Text { text: data.title; color: Ui.on-accent; font-size: Ui.headline-md; font-family: Ui.font-title; font-weight: 600; vertical-alignment: bottom; }
+        Text { text: data.count; color: Ui.on-accent-subtle; font-size: Ui.label-md; font-weight: 600; font-family: Ui.font-text; vertical-alignment: bottom; }
+    }
+    Rectangle {
+        y: 60 * Ui.u;
+        height: 370 * Ui.u + 30 * Ui.u;
+        clip: false;
+        rail := Rectangle {
+            x: 64 * Ui.u - anchor * step;
+            animate x { duration: Ui.page-time; easing: cubic-bezier(0.22, 1, 0.36, 1); }
+            for t[i] in data.tiles: GameCard {
+                // Só desenha as capas perto da tela (virtualização da fileira).
+                visible: i >= anchor - 2 && i <= anchor + 12;
+                x: i * step;
+                y: 18 * Ui.u;
+                tile: t;
+                focused: i == sel;
+                clicked => { root.clicked(i); }
+                hovered => { root.hovered(i); }
+            }
+            if data.see-all: Rectangle {
+                x: data.tiles.length * step;
+                y: 18 * Ui.u;
+                width: 204 * Ui.u;
+                height: 306 * Ui.u;
+                border-radius: Ui.radius-md;
+                background: sel == data.tiles.length ? Ui.surface-solid : Ui.surface-1;
+                Text {
+                    text: see-all-label;
+                    color: sel == data.tiles.length ? Ui.on-surface-solid : Ui.on-accent;
+                    font-size: Ui.label-lg;
+                    font-weight: 600;
+                    font-family: Ui.font-text;
+                }
+                TouchArea { clicked => { root.clicked(data.tiles.length); } }
+            }
+        }
+    }
+}
+
+component HomePage inherits Rectangle {
+    in property <Hero> hero;
+    in property <int> hero-focus;
+    in property <[HomeRow]> rows;
+    in property <int> row-focus;
+    in property <int> col-focus;
+    in property <bool> empty;
+    in property <string> empty-title;
+    in property <string> empty-text;
+    in property <[PanelRow]> empty-actions;
+    in property <string> see-all-label;
+    in property <string> info-label;
+    callback clicked(string, int);
+    callback hovered(string, int);
+    property <length> hero-h: 560 * Ui.u;
+    property <length> row-h: 470 * Ui.u;
+    property <int> shown-row;
+    init => { shown-row = row-focus; }
+    changed row-focus => { if (!Ui.pointer) { shown-row = row-focus; } }
+    property <length> scroll: shown-row <= 0 ? 0 : -(hero-h - 120 * Ui.u + (shown-row - 1) * row-h);
+    clip: true;
+    if empty: VerticalLayout {
+        x: 64 * Ui.u;
+        width: min(1100 * Ui.u, parent.width - 136 * Ui.u);
+        alignment: center;
+        spacing: 18 * Ui.u;
+        Text { text: empty-title; color: Ui.on-accent; font-size: Ui.headline-lg; font-family: Ui.font-title; font-weight: 300; }
+        Text { text: empty-text; color: Ui.on-accent-muted; font-size: Ui.body-lg; font-family: Ui.font-text; wrap: word-wrap; }
+        HorizontalLayout {
+            spacing: 18 * Ui.u;
+            alignment: start;
+            padding-top: 22 * Ui.u;
+            for a[i] in empty-actions: Pill {
+                label: a.title;
+                icon: a.icon;
+                primary: i == 0;
+                focused: i == hero-focus;
+                clicked => { root.clicked("empty", i); }
+                hovered => { root.hovered("empty", i); }
+            }
+        }
+    }
+    if !empty: Rectangle {
+        y: scroll;
+        animate y { duration: Ui.page-time; easing: cubic-bezier(0.22, 1, 0.36, 1); }
+        height: hero-h + rows.length * row-h;
+        // Destaque ancorado embaixo: o título cresce para cima e os botões não se movem.
+        VerticalLayout {
+            x: 64 * Ui.u;
+            y: 0;
+            width: min(1200 * Ui.u, root.width - 136 * Ui.u);
+            height: hero-h - 40 * Ui.u;
+            alignment: end;
+            spacing: 10 * Ui.u;
+            if hero.overline != "": Overline { text: hero.overline; }
+            if hero.logo.width > 0: Image { source: hero.logo; height: 180 * Ui.u; image-fit: contain; horizontal-alignment: left; }
+            if hero.logo.width == 0: GameTitle { text: hero.title; }
+            Text { text: hero.meta; color: Ui.on-accent-muted; font-size: Ui.body-md; font-family: Ui.font-text; }
+            HorizontalLayout {
+                padding-top: 24 * Ui.u;
+                spacing: 18 * Ui.u;
+                alignment: start;
+                Pill {
+                    label: hero.play-label;
+                    icon: "play";
+                    primary: true;
+                    focused: row-focus < 0 && hero-focus == 0;
+                    clicked => { root.clicked("hero", 0); }
+                    hovered => { root.hovered("hero", 0); }
+                }
+                Pill {
+                    icon: "info";
+                    focused: row-focus < 0 && hero-focus == 1;
+                    clicked => { root.clicked("hero", 1); }
+                    hovered => { root.hovered("hero", 1); }
+                }
+            }
+        }
+        for r[ri] in rows: GameRow {
+            y: hero-h + ri * row-h;
+            width: root.width;
+            data: r;
+            sel: ri == row-focus ? col-focus : -1;
+            see-all-label: see-all-label;
+            clicked(i) => { root.clicked("row-" + ri, i); }
+            hovered(i) => { root.hovered("row-" + ri, i); }
+        }
+    }
+}
+
+component LibraryPage inherits Rectangle {
+    in property <string> title;
+    in property <string> count;
+    in property <[PanelRow]> chips;
+    in property <int> chip-focus;
+    in property <[Tile]> tiles;
+    in property <int> sel;
+    in property <string> empty-title;
+    in property <string> empty-text;
+    out property <int> columns: max(1, floor((self.width - 128 * Ui.u + 26 * Ui.u) / (204 * Ui.u + 26 * Ui.u)));
+    callback clicked(string, int);
+    callback hovered(string, int);
+    property <length> cell-w: 230 * Ui.u;
+    property <length> cell-h: 420 * Ui.u;
+    property <length> top: 230 * Ui.u;
+    property <int> rows: ceil(tiles.length / columns);
+    property <int> shown;
+    init => { shown = sel; }
+    changed sel => { if (!Ui.pointer) { shown = sel; } }
+    property <int> focus-row: shown < 0 ? 0 : floor(shown / columns);
+    property <length> view-h: self.height - top - Ui.hint-bar;
+    property <length> scroll: min(0, max(view-h - rows * cell-h, -(focus-row * cell-h) + (view-h - cell-h) / 2));
+    VerticalLayout {
+        x: 64 * Ui.u;
+        y: 56 * Ui.u;
+        width: root.width - 136 * Ui.u;
+        height: top - 70 * Ui.u;
+        spacing: 16 * Ui.u;
+        HorizontalLayout {
+            spacing: 18 * Ui.u;
+            Text { text: title; color: Ui.on-accent; font-size: Ui.headline-md; font-family: Ui.font-title; font-weight: 600; vertical-alignment: center; }
+            Text { text: count; color: Ui.on-accent-subtle; font-size: Ui.label-md; font-family: Ui.font-text; vertical-alignment: center; horizontal-stretch: 1; }
+        }
+        HorizontalLayout {
+            spacing: 14 * Ui.u;
+            alignment: start;
+            for c[i] in chips: Rectangle {
+                height: 60 * Ui.u;
+                width: ct.preferred-width + 60 * Ui.u + (c.icon != "" ? 36 * Ui.u : 0);
+                border-radius: self.height / 2;
+                background: i == chip-focus ? Ui.surface-solid : Ui.surface-1;
+                HorizontalLayout {
+                    padding-left: 30 * Ui.u;
+                    padding-right: 30 * Ui.u;
+                    spacing: 10 * Ui.u;
+                    if c.icon != "": Icon { name: c.icon; size: 24 * Ui.u; y: (parent.height - self.height) / 2; tint: i == chip-focus ? Ui.on-surface-solid : Ui.on-accent-muted; }
+                    ct := Text {
+                        text: c.title;
+                        color: i == chip-focus ? Ui.on-surface-solid : Ui.on-accent-muted;
+                        font-size: Ui.label-md;
+                        font-weight: 600;
+                        font-family: Ui.font-text;
+                        vertical-alignment: center;
+                    }
+                }
+                TouchArea {
+                    clicked => { root.clicked("chip", i); }
+                    changed has-hover => { if (self.has-hover) { root.hovered("chip", i); } }
+                }
+            }
+        }
+    }
+    if tiles.length == 0: VerticalLayout {
+        x: 64 * Ui.u;
+        y: top + 40 * Ui.u;
+        width: root.width - 136 * Ui.u;
+        spacing: 12 * Ui.u;
+        alignment: start;
+        Text { text: empty-title; color: Ui.on-accent; font-size: Ui.headline-md; font-family: Ui.font-title; }
+        Text { text: empty-text; color: Ui.on-accent-muted; font-size: Ui.body-md; font-family: Ui.font-text; wrap: word-wrap; }
+    }
+    Rectangle {
+        y: top;
+        height: view-h;
+        clip: true;
+        Rectangle {
+            y: scroll;
+            animate y { duration: Ui.page-time; easing: cubic-bezier(0.22, 1, 0.36, 1); }
+            // Virtualização: só as linhas visíveis instanciam capas.
+            for r in rows: Rectangle {
+                property <length> ry: r * cell-h;
+                property <bool> near: ry + scroll > -2 * cell-h && ry + scroll < view-h + cell-h;
+                x: 64 * Ui.u;
+                y: ry + 24 * Ui.u;
+                height: cell-h;
+                if near: Rectangle {
+                    for c in min(columns, tiles.length - r * columns): GameCard {
+                        x: c * cell-w;
+                        tile: tiles[r * columns + c];
+                        focused: r * columns + c == sel;
+                        clicked => { root.clicked("grid", r * columns + c); }
+                        hovered => { root.hovered("grid", r * columns + c); }
+                    }
+                }
+            }
+        }
+    }
+}
+
+component DetailsPage inherits Rectangle {
+    in property <Details> details;
+    in property <[Stat]> stats;
+    in property <[PanelRow]> actions;
+    in property <int> sel;
+    callback clicked(string, int);
+    callback hovered(string, int);
+    HorizontalLayout {
+        x: 64 * Ui.u;
+        y: 90 * Ui.u;
+        width: root.width - 136 * Ui.u;
+        height: root.height - 90 * Ui.u - Ui.hint-bar;
+        spacing: 56 * Ui.u;
+        Rectangle {
+            width: 340 * Ui.u;
+            height: 510 * Ui.u;
+            border-radius: Ui.radius-md;
+            clip: true;
+            background: @linear-gradient(160deg, Ui.accent 0%, Ui.accent-deep 100%);
+            Image { source: details.cover; width: parent.width; height: parent.height; image-fit: cover; }
+        }
+        VerticalLayout {
+            spacing: 14 * Ui.u;
+            alignment: start;
+            horizontal-stretch: 1;
+            if details.overline != "": Overline { text: details.overline; }
+            if details.logo.width > 0: Image { source: details.logo; height: 160 * Ui.u; image-fit: contain; horizontal-alignment: left; }
+            if details.logo.width == 0: GameTitle { text: details.title; }
+            Text { text: details.meta; color: Ui.on-accent-muted; font-size: Ui.body-md; font-family: Ui.font-text; }
+            HorizontalLayout {
+                padding-top: 18 * Ui.u;
+                padding-bottom: 18 * Ui.u;
+                spacing: 18 * Ui.u;
+                alignment: start;
+                for a[i] in actions: Pill {
+                    label: a.title;
+                    icon: a.icon;
+                    primary: i == 0;
+                    enabled: a.enabled;
+                    focused: i == sel;
+                    clicked => { root.clicked("action", i); }
+                    hovered => { root.hovered("action", i); }
+                }
+            }
+            if details.hint != "": Text { text: details.hint; color: Ui.warning; font-size: Ui.label-md; font-family: Ui.font-text; wrap: word-wrap; }
+            Text {
+                text: details.description;
+                color: Ui.on-accent-muted;
+                font-size: Ui.body-lg;
+                font-family: Ui.font-text;
+                wrap: word-wrap;
+                max-height: 3 * 1.45 * Ui.body-lg;
+                overflow: elide;
+            }
+            Rectangle { height: 18 * Ui.u; }
+            // Estatísticas em duas colunas.
+            for s[i] in stats: HorizontalLayout {
+                spacing: 24 * Ui.u;
+                Text { text: s.label; width: 260 * Ui.u; color: Ui.on-accent-subtle; font-size: Ui.label-md; font-family: Ui.font-text; }
+                Text { text: s.value; color: Ui.on-accent; font-size: Ui.label-md; font-weight: 600; font-family: Ui.font-text; horizontal-stretch: 1; overflow: elide; }
+            }
+        }
+    }
+}
+
+component SettingsPage inherits Rectangle {
+    in property <string> title;
+    in property <[NavItem]> categories;
+    in property <int> category-focus;
+    in property <string> heading;
+    in property <string> subtitle;
+    in property <[PanelRow]> rows;
+    in property <int> row-focus;
+    callback clicked(string, int);
+    callback hovered(string, int);
+    property <length> top: 180 * Ui.u;
+    property <length> row-h: 108 * Ui.u;
+    property <length> view-h: self.height - top - Ui.hint-bar - 120 * Ui.u;
+    property <int> shown-row;
+    init => { shown-row = row-focus; }
+    changed row-focus => { if (!Ui.pointer) { shown-row = row-focus; } }
+    property <length> scroll: min(0, max(view-h - rows.length * row-h, -(max(0, shown-row) * row-h) + (view-h - row-h) / 2));
+    Text { x: 64 * Ui.u; y: 56 * Ui.u; text: title; color: Ui.on-accent; font-size: Ui.headline-md; font-family: Ui.font-title; font-weight: 600; }
+    VerticalLayout {
+        x: 64 * Ui.u;
+        y: top;
+        width: 340 * Ui.u;
+        spacing: 8 * Ui.u;
+        alignment: start;
+        for c[i] in categories: Rectangle {
+            height: 68 * Ui.u;
+            border-radius: Ui.radius-md;
+            background: i == category-focus && row-focus < 0 ? Ui.surface-solid : (c.selected ? Ui.surface-2 : transparent);
+            HorizontalLayout {
+                padding-left: 20 * Ui.u;
+                spacing: 16 * Ui.u;
+                Icon { name: c.icon; y: (parent.height - self.height) / 2; tint: i == category-focus && row-focus < 0 ? Ui.on-surface-solid : Ui.on-accent; }
+                Text {
+                    text: c.label;
+                    color: i == category-focus && row-focus < 0 ? Ui.on-surface-solid : Ui.on-accent;
+                    font-size: Ui.label-lg;
+                    font-weight: 600;
+                    font-family: Ui.font-text;
+                    vertical-alignment: center;
+                }
+            }
+            TouchArea {
+                clicked => { root.clicked("category", i); }
+                changed has-hover => { if (self.has-hover) { root.hovered("category", i); } }
+            }
+        }
+    }
+    Rectangle {
+        x: 64 * Ui.u + 340 * Ui.u + 56 * Ui.u;
+        y: top;
+        width: root.width - self.x - 72 * Ui.u;
+        height: root.height - top - Ui.hint-bar;
+        VerticalLayout {
+            y: 0;
+            height: 110 * Ui.u;
+            spacing: 6 * Ui.u;
+            alignment: start;
+            Text { text: heading; color: Ui.on-accent; font-size: Ui.title-md; font-weight: 600; font-family: Ui.font-text; }
+            Text { text: subtitle; color: Ui.on-accent-muted; font-size: Ui.body-md; font-family: Ui.font-text; wrap: word-wrap; }
+        }
+        Rectangle {
+            y: 120 * Ui.u;
+            height: view-h;
+            clip: true;
+            Rectangle {
+                y: scroll;
+                animate y { duration: Ui.page-time; easing: cubic-bezier(0.22, 1, 0.36, 1); }
+                for r[i] in rows: RowView {
+                    x: 8 * Ui.u;
+                    width: parent.width - 16 * Ui.u;
+                    y: i * row-h + 8 * Ui.u;
+                    height: row-h - 16 * Ui.u;
+                    data: r;
+                    focused: i == row-focus;
+                    panel-style: false;
+                    clicked => { root.clicked("row", i); }
+                    hovered => { root.hovered("row", i); }
+                }
+            }
+        }
+    }
+}
+
+// Central rápida durante o jogo (DESIGN.md › Menu rápido), reduzida às funções do Tako. `overlay`: aberta por cima do
+// jogo (janela transparente, só a barra no alto, o jogo aparece atrás); senão cobre o Tako aberto.
+export component ControlCenter inherits Rectangle {
+    in property <[PanelRow]> icons;
+    in property <int> icon-focus;
+    in property <int> panel-for;
+    in property <[PanelRow]> panel;
+    in property <int> panel-focus;
+    in property <string> game-title;
+    in property <string> game-meta;
+    in property <bool> overlay;
+    callback clicked(string, int);
+    callback hovered(string, int);
+    property <length> icon-step: 132 * Ui.u;
+    property <length> bar-x: (self.width - icons.length * icon-step) / 2;
+    property <length> bar-y: 40 * Ui.u;
+    background: overlay
+        ? @linear-gradient(180deg, #000000CC 0%, #00000080 14%, #00000000 30%)
+        : @linear-gradient(180deg, #000000D9 0%, #00000080 55%, #00000033 100%);
+    // Jogo aberto, à esquerda da barra.
+    VerticalLayout {
+        x: Ui.safe-x;
+        y: bar-y + (84 * Ui.u - self.preferred-height) / 2;
+        width: max(0, bar-x - Ui.safe-x - 24 * Ui.u);
+        height: self.preferred-height;
+        spacing: 2 * Ui.u;
+        Text { text: game-meta; color: Ui.on-accent-muted; font-size: Ui.label-sm; font-weight: 600; font-family: Ui.font-text; overflow: elide; }
+        Text { text: game-title; color: Ui.on-accent; font-size: Ui.headline-md; font-family: Ui.font-title; font-weight: 600; overflow: elide; }
+    }
+    for ic[i] in icons: Rectangle {
+        x: bar-x + i * icon-step;
+        y: bar-y;
+        width: icon-step;
+        height: 84 * Ui.u + 44 * Ui.u;
+        Rectangle {
+            y: 0;
+            width: 84 * Ui.u;
+            height: 84 * Ui.u;
+            border-radius: self.height / 2;
+            background: i == icon-focus && panel-focus < 0 ? Ui.surface-solid : (i == panel-for ? Ui.surface-2 : Ui.surface-1);
+            Icon {
+                name: ic.icon;
+                size: 36 * Ui.u;
+                tint: i == icon-focus && panel-focus < 0 ? Ui.on-surface-solid : (ic.style == "danger" ? Ui.error : Ui.on-accent);
+            }
+            TouchArea {
+                clicked => { root.clicked("icon", i); }
+                changed has-hover => { if (self.has-hover) { root.hovered("icon", i); } }
+            }
+        }
+        // O rótulo passa da largura do ícone (ex.: "Voltar ao jogo") sem ser cortado.
+        Text {
+            y: 84 * Ui.u + 10 * Ui.u;
+            width: 320 * Ui.u;
+            text: i == icon-focus || i == panel-for ? ic.title : "";
+            color: Ui.on-accent;
+            font-size: Ui.label-sm;
+            font-weight: 600;
+            font-family: Ui.font-text;
+            horizontal-alignment: center;
+        }
+    }
+    if panel-for >= 0: Rectangle {
+        x: clamp(bar-x + panel-for * icon-step + icon-step / 2 - self.width / 2, Ui.safe-x, root.width - self.width - Ui.safe-x);
+        y: 40 * Ui.u + 84 * Ui.u + 56 * Ui.u;
+        width: 600 * Ui.u;
+        height: min(panel.length * 100 * Ui.u + 32 * Ui.u, root.height - self.y - Ui.hint-bar - 140 * Ui.u);
+        border-radius: Ui.radius-lg;
+        background: Ui.accent-deep.with-alpha(0.97);
+        RowList {
+            x: 16 * Ui.u;
+            y: 16 * Ui.u;
+            width: parent.width - 32 * Ui.u;
+            height: parent.height - 32 * Ui.u;
+            rows: panel;
+            sel: panel-focus;
+            clicked(i) => { root.clicked("panel", i); }
+            hovered(i) => { root.hovered("panel", i); }
+        }
+    }
+}
+
+// Um tentáculo da entrada do app: a camada inteira do polvo, chegando girando a partir da base do corpo (como na
+// TelaCarregamento, que tem o mesmo desenho; aqui a janela é a principal).
+component IntroTentacle inherits Rectangle {
+    in property <image> source;
+    in property <bool> arrived;
+    // -1 esquerda, 1 direita, 0 os da frente (só crescem).
+    in property <int> side;
+    // Atraso da chegada, para os tentáculos não chegarem juntos.
+    in property <duration> wait;
+    opacity: arrived ? 1 : 0;
+    transform-origin: { x: self.width * 0.5, y: self.height * 0.41 };
+    transform-rotation: arrived ? 0deg : side * 40deg;
+    transform-scale: arrived ? 1 : 0.6;
+    animate opacity, transform-rotation, transform-scale { duration: Ui.tempo-intro-polvo; delay: root.wait; easing: cubic-bezier(0.34, 1.56, 0.64, 1); }
+    Image { width: parent.width; height: parent.height; source: root.source; }
+}
+
+export component App inherits Window {
+    // Geral.
+    in property <string> page: "home";
+    in property <image> backdrop;
+    in property <string> clock;
+    in property <string> input-label;
+    in property <string> input-icon: "gamepad";
+    in property <string> pad-battery;
+    in property <string> toast;
+    in property <[Hint]> hints;
+    in property <bool> transparent-background;
+    // A janela do jogo apareceu: "Abrindo…" some aos poucos.
+    in property <bool> leaving;
+    // Entrada do app (BRAND-002): o polvo se monta por cima da primeira tela, que já está pronta por baixo. Some
+    // sozinha em cerca de 1 s ou quando o usuário aperta qualquer coisa. Nunca liga com "Reduzir animações".
+    in property <bool> intro;
+
+    // Barra lateral.
+    in property <[NavItem]> sidebar;
+    in property <int> sidebar-focus: -1;
+    in property <bool> sidebar-visible: true;
+
+    // Início.
+    in property <Hero> hero;
+    in property <int> hero-focus;
+    in property <[HomeRow]> home-rows;
+    in property <int> home-row-focus: -1;
+    in property <int> home-col-focus;
+    in property <bool> home-empty;
+    in property <string> home-empty-title;
+    in property <string> home-empty-text;
+    in property <[PanelRow]> home-empty-actions;
+    in property <string> see-all-label;
+
+    // Biblioteca.
+    in property <string> library-title;
+    in property <string> library-count;
+    in property <[PanelRow]> library-chips;
+    in property <int> library-chip-focus: -1;
+    in property <[Tile]> library-tiles;
+    in property <int> library-focus: -1;
+    in property <string> library-empty-title;
+    in property <string> library-empty-text;
+    out property <int> library-columns: library.columns;
+
+    // Detalhes.
+    in property <Details> details;
+    in property <[Stat]> details-stats;
+    in property <[PanelRow]> details-actions;
+    in property <int> details-focus;
+
+    // Configurações.
+    in property <string> settings-title;
+    in property <[NavItem]> settings-categories;
+    in property <int> settings-category-focus;
+    in property <string> settings-heading;
+    in property <string> settings-subtitle;
+    in property <[PanelRow]> settings-rows;
+    in property <int> settings-row-focus: -1;
+
+    // Central rápida.
+    in property <bool> control-center;
+    in property <[PanelRow]> cc-icons;
+    in property <int> cc-icon-focus;
+    in property <int> cc-panel-for: -1;
+    in property <[PanelRow]> cc-panel;
+    in property <int> cc-panel-focus: -1;
+    in property <string> cc-game-title;
+    in property <string> cc-game-meta;
+
+    // Camadas abertas (a última recebe o foco).
+    in property <[Overlay]> overlays;
+
+    // Entrada: zona ("sidebar", "hero", "row-N", "grid", "chip", "action", "category", "row", "key"...) e índice.
+    callback clicked(string, int);
+    callback hovered(string, int);
+    callback hint-clicked(int);
+    // Tecla física: texto da tecla (Slint), modificadores; devolve se tratou.
+    callback key(string, bool, bool, bool, bool) -> bool;
+    callback key-released(string);
+
+    title: "Tako";
+    icon: @image-url("tako-mark.png");
+    preferred-width: 1280px;
+    preferred-height: 720px;
+    min-width: 640px;
+    min-height: 360px;
+    background: transparent-background ? transparent : Ui.canvas;
+    default-font-family: Ui.font-text;
+
+    init => {
+        Ui.u = self.height / 1080;
+        fs.focus();
+    }
+    changed height => { Ui.u = self.height / 1080; }
+
+    if show-tako: Backdrop {
+        art: backdrop;
+        dim-left: page == "settings";
+    }
+
+    property <length> content-x: sidebar-visible && page != "details" ? (sidebar-focus >= 0 ? 400 * Ui.u : 120 * Ui.u) : 0;
+
+    // Central por cima do jogo: só a barra dela; o jogo aparece pela janela transparente.
+    property <bool> over-game: control-center && transparent-background;
+    // O Tako (fundo, páginas, barra lateral, dicas) some por cima do jogo: Central sobre ele ou saindo para ele.
+    property <bool> show-tako: !(transparent-background && (control-center || leaving));
+
+    Rectangle {
+        x: content-x;
+        visible: show-tako;
+        width: root.width - content-x;
+        animate x, width { duration: Ui.page-time; easing: cubic-bezier(0.22, 1, 0.36, 1); }
+        if page == "home": HomePage {
+            hero: hero;
+            hero-focus: sidebar-focus >= 0 ? -1 : hero-focus;
+            rows: home-rows;
+            row-focus: sidebar-focus >= 0 ? -1 : home-row-focus;
+            col-focus: home-col-focus;
+            empty: home-empty;
+            empty-title: home-empty-title;
+            empty-text: home-empty-text;
+            empty-actions: home-empty-actions;
+            see-all-label: see-all-label;
+            clicked(z, i) => { root.clicked(z, i); }
+            hovered(z, i) => { root.hovered(z, i); }
+        }
+        library := LibraryPage {
+            visible: page == "library";
+            title: library-title;
+            count: library-count;
+            chips: library-chips;
+            chip-focus: sidebar-focus >= 0 ? -1 : library-chip-focus;
+            tiles: page == "library" ? library-tiles : [];
+            sel: sidebar-focus >= 0 ? -1 : library-focus;
+            empty-title: library-empty-title;
+            empty-text: library-empty-text;
+            clicked(z, i) => { root.clicked(z, i); }
+            hovered(z, i) => { root.hovered(z, i); }
+        }
+        if page == "details": DetailsPage {
+            details: details;
+            stats: details-stats;
+            actions: details-actions;
+            sel: details-focus;
+            clicked(z, i) => { root.clicked(z, i); }
+            hovered(z, i) => { root.hovered(z, i); }
+        }
+        if page == "settings": SettingsPage {
+            title: settings-title;
+            categories: settings-categories;
+            category-focus: settings-category-focus;
+            heading: settings-heading;
+            subtitle: settings-subtitle;
+            rows: settings-rows;
+            row-focus: sidebar-focus >= 0 ? -2 : settings-row-focus;
+            clicked(z, i) => { root.clicked(z, i); }
+            hovered(z, i) => { root.hovered(z, i); }
+        }
+    }
+
+    if sidebar-visible && page != "details" && !control-center && show-tako: Sidebar {
+        x: 0;
+        height: root.height;
+        items: sidebar;
+        sel: sidebar-focus;
+        expanded: sidebar-focus >= 0;
+        clicked(i) => { root.clicked("sidebar", i); }
+        hovered(i) => { root.hovered("sidebar", i); }
+    }
+
+    if !control-center && show-tako: StatusCorner {
+        x: root.width - 600 * Ui.u - Ui.safe-x;
+        y: 14 * Ui.u;
+        width: 600 * Ui.u;
+        height: 40 * Ui.u;
+        clock: clock;
+        input-label: input-label;
+        input-icon: input-icon;
+        pad-battery: pad-battery;
+    }
+
+    if control-center: ControlCenter {
+        icons: cc-icons;
+        icon-focus: cc-icon-focus;
+        panel-for: cc-panel-for;
+        panel: cc-panel;
+        panel-focus: cc-panel-focus;
+        game-title: cc-game-title;
+        game-meta: cc-game-meta;
+        overlay: over-game;
+        clicked(z, i) => { root.clicked("cc-" + z, i); }
+        hovered(z, i) => { root.hovered("cc-" + z, i); }
+    }
+
+    for ov[i] in overlays: OverlayView {
+        ov: ov;
+        art: backdrop;
+        leaving: leaving;
+        top-most: i == overlays.length - 1;
+        clicked(z, idx) => { if (i == overlays.length - 1) { root.clicked("overlay-" + z, idx); } }
+        hovered(z, idx) => { if (i == overlays.length - 1) { root.hovered("overlay-" + z, idx); } }
+    }
+
+    HintBar {
+        visible: show-tako;
+        y: root.height - self.height;
+        width: root.width;
+        hints: hints;
+        activate(i) => { root.hint-clicked(i); }
+    }
+
+    if toast != "": Rectangle {
+        x: (root.width - self.width) / 2;
+        y: root.height - Ui.hint-bar - self.height - 24 * Ui.u;
+        height: 64 * Ui.u;
+        width: tt.preferred-width + 64 * Ui.u;
+        border-radius: self.height / 2;
+        background: Ui.surface-solid;
+        drop-shadow-blur: 24 * Ui.u;
+        drop-shadow-color: #00000066;
+        tt := Text { text: toast; color: Ui.on-surface-solid; font-size: Ui.label-lg; font-weight: 600; font-family: Ui.font-text; }
+    }
+
+    // Entrada do app: começa montada no 1º quadro (sem esperar nada) e os tentáculos chegam logo depois.
+    property <bool> intro-play;
+    Timer {
+        interval: 16ms;
+        running: root.intro && !root.intro-play;
+        triggered => { root.intro-play = true; }
+    }
+    Rectangle {
+        visible: root.intro || self.opacity > 0;
+        background: Ui.splash-bg;
+        opacity: root.intro ? 1 : 0;
+        animate opacity { duration: Ui.intro-fade(root.intro); easing: cubic-bezier(0.22, 1, 0.36, 1); }
+        accessible-role: image;
+        accessible-label: "Tako";
+        // Só enquanto a entrada está ligada: na saída (fade) o véu não pode engolir cliques e hover reais.
+        TouchArea { visible: root.intro; clicked => { root.clicked("intro", 0); } }
+        Rectangle {
+            height: root.height * 0.5;
+            width: self.height * 704 / 802;
+            x: (root.width - self.width) / 2;
+            y: (root.height - self.height) / 2;
+            Image { width: parent.width; height: parent.height; source: @image-url("splash/splash-base.png"); }
+            IntroTentacle { source: @image-url("splash/splash-t1.png"); arrived: root.intro-play; side: -1; wait: 0ms; }
+            IntroTentacle { source: @image-url("splash/splash-t2.png"); arrived: root.intro-play; side: 1; wait: 40ms; }
+            IntroTentacle { source: @image-url("splash/splash-t3.png"); arrived: root.intro-play; side: -1; wait: 80ms; }
+            IntroTentacle { source: @image-url("splash/splash-t4.png"); arrived: root.intro-play; side: 1; wait: 120ms; }
+            IntroTentacle { source: @image-url("splash/splash-t5.png"); arrived: root.intro-play; side: -1; wait: 160ms; }
+            IntroTentacle { source: @image-url("splash/splash-t6.png"); arrived: root.intro-play; side: 1; wait: 200ms; }
+            IntroTentacle { source: @image-url("splash/splash-t7.png"); arrived: root.intro-play; side: 0; wait: 240ms; }
+        }
+    }
+
+    // Teclado físico: o Tako decide o que cada tecla faz.
+    fs := FocusScope {
+        key-pressed(e) => {
+            if (root.key(e.text, e.repeat, e.modifiers.control, e.modifiers.shift, e.modifiers.alt)) { return accept; }
+            reject
+        }
+        key-released(e) => {
+            root.key-released(e.text);
+            accept
+        }
+    }
+}

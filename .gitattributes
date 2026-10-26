@@ -1,4 +1,6 @@
 * text=auto eol=lf
-*.sln text eol=crlf
 *.png binary
 *.pthm binary
+
+# Preservar os bytes do SCCD validados pelo AppX (incluindo CRLF).
+packaging/fse/CustomCapability.SCCD -text whitespace=cr-at-eol

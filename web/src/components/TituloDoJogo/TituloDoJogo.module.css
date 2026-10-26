@@ -1,0 +1,42 @@
+/* TituloDoJogo (README): o logo (até 440×140 na página, 320×100 na Visão geral), `object-fit: contain`, alinhado
+   embaixo à direita, com sombra `0 6px 24px` a 60%. Sem logo, o nome em Poppins 54/800. */
+
+.titulo {
+  --logo-largura: 440px;
+  --logo-altura: 140px;
+
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  max-width: 100%;
+  margin: 0;
+  font: inherit;
+}
+
+.visao {
+  --logo-largura: 320px;
+  --logo-altura: 100px;
+}
+
+.logo {
+  display: block;
+  max-width: var(--logo-largura);
+  max-height: var(--logo-altura);
+  object-fit: contain;
+  object-position: right bottom;
+  filter: drop-shadow(0 6px 24px color-mix(in srgb, var(--canvas) 60%, transparent));
+}
+
+.texto {
+  max-width: var(--logo-largura);
+  font-family: var(--font-heading);
+  font-size: 54px;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  text-align: right;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  text-shadow: 0 6px 24px color-mix(in srgb, var(--canvas) 60%, transparent);
+}

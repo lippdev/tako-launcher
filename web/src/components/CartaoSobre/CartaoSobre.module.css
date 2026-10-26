@@ -1,0 +1,24 @@
+/* CartaoSobre (README): título 14,5/800 em caixa alta, parágrafos de 13 com entrelinha 1,65. */
+
+.sobre {
+  min-width: 0;
+}
+
+.titulo {
+  margin: 0 0 var(--space-8);
+  font-family: var(--font-heading);
+  font-size: 14.5px;
+  font-weight: 800;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.texto {
+  margin: 0 0 15px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: color-mix(in srgb, var(--text) 82%, transparent);
+  /* A descrição vem do núcleo em texto puro: as quebras de linha dentro do parágrafo valem. */
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}

@@ -1,0 +1,186 @@
+/* ErroDoJogo (SESSION-003): diálogo M (540) com a capa e ponto amarelo */
+
+/* Oculta visualmente o cabeçalho padrão do Dialogo para renderizar o cabeçalho com capa e subtítulo */
+.dialogo > header {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.cabecalho {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-14);
+}
+
+.capaWrap {
+  position: relative;
+  flex: none;
+  width: var(--erro-capa-tamanho);
+  height: var(--erro-capa-tamanho);
+}
+
+.capa {
+  width: var(--erro-capa-tamanho);
+  height: var(--erro-capa-tamanho);
+  border-radius: var(--erro-capa-radius);
+  object-fit: cover;
+  display: block;
+}
+
+.capaVazia {
+  display: grid;
+  place-items: center;
+  width: var(--erro-capa-tamanho);
+  height: var(--erro-capa-tamanho);
+  border-radius: var(--erro-capa-radius);
+  background: var(--tile);
+  color: var(--text-muted);
+}
+
+.pontoAlerta {
+  position: absolute;
+  right: var(--erro-ponto-offset);
+  bottom: var(--erro-ponto-offset);
+  width: var(--erro-ponto-tamanho);
+  height: var(--erro-ponto-tamanho);
+  border-radius: var(--radius-full);
+  background: var(--warning);
+  border: var(--erro-ponto-borda) solid var(--surface-raised);
+}
+
+.titulos {
+  flex: 1;
+  min-width: 0;
+}
+
+.titulo {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+.subtitulo {
+  margin: var(--space-4) 0 0;
+  font-family: var(--font-text);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.botaoFechar {
+  composes: ring from "../../lib/focus.module.css";
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--tempo-hover) var(--curva-estado),
+    color var(--tempo-hover) var(--curva-estado);
+}
+
+.botaoFechar:hover {
+  background: var(--glass-hover);
+  color: var(--text);
+}
+
+.mensagem {
+  margin: var(--space-14) 0 0;
+  font-family: var(--font-text);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+  /* O código de saída e a sugestão vêm em duas partes separadas por linha em branco. */
+  white-space: pre-line;
+}
+
+.detalhesTecnicos {
+  composes: ring from "../../lib/focus.module.css";
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: var(--space-14);
+  padding: var(--space-10) var(--space-14);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--surface-raised);
+  color: var(--text);
+  font-family: var(--font-text);
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: background-color var(--tempo-hover) var(--curva-estado);
+}
+
+.detalhesTecnicos:hover {
+  background: var(--tile);
+}
+
+.codigoWrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  color: var(--text-muted);
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.chevron {
+  display: grid;
+  place-items: center;
+  transition: transform var(--tempo-hover) var(--curva-estado);
+}
+
+.chevronAberto {
+  transform: rotate(90deg);
+}
+
+.detalhesCorpo {
+  margin-top: var(--space-6);
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-control);
+  background: var(--tile);
+  border: 1px solid var(--line);
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+.salvarRelatorio {
+  composes: ring from "../../lib/focus.module.css";
+  margin: 0;
+  margin-right: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-text);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color var(--tempo-hover) var(--curva-estado);
+}
+
+.salvarRelatorio:hover {
+  color: var(--text);
+}

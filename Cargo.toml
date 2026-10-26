@@ -1,0 +1,107 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.2.0-alpha.1"
+edition = "2024"
+license = "AGPL-3.0-only"
+repository = "https://github.com/lippdev/tako-launcher"
+rust-version = "1.97"
+
+[workspace.dependencies]
+tako-core = { path = "crates/tako-core" }
+tako-sources = { path = "crates/tako-sources" }
+tako-platform = { path = "crates/tako-platform" }
+tako-themes = { path = "crates/tako-themes" }
+tako-ui = { path = "crates/tako-ui" }
+tako-downloads = { path = "crates/tako-downloads" }
+tako-app = { path = "crates/tako-app" }
+tako-web = { path = "crates/tako-web" }
+# Mesmo binário nos subprocessos: o sandbox da crate exige outro bootstrap no Windows.
+cef = { version = "=156.2.0", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ts-rs = { version = "12", features = ["serde-json-impl"] }
+toml = "1"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+rusqlite = { version = "0.40", features = ["bundled"] }
+ureq = { version = "3", features = ["json"] }
+sha2 = "0.10"
+plist = "1"
+sha1 = "0.10"
+md-5 = "0.10"
+crc32fast = "1"
+regex = "1"
+unicode-normalization = "0.1"
+uuid = { version = "1", features = ["v4"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "ico"] }
+zip = { version = "9", default-features = false, features = ["deflate"] }
+keyring = "4"
+tempfile = "3"
+insta = "1"
+slint = { version = "1.18.1", default-features = false, features = ["std", "compat-1-2", "unstable-winit-030"] }
+slint-interpreter = { version = "1.18.1", default-features = false, features = ["backend-default", "renderer-femtovg", "renderer-software", "compat-1-2"] }
+# Só para dar chave de cache às imagens decodificadas (images::shared); o slint fixa esta mesma versão exata.
+i-slint-core = { version = "=1.18.1", default-features = false }
+roxmltree = "0.21"
+rfd = "0.15.4"
+arboard = { version = "3", default-features = false }
+libc = "0.2"
+x11rb = { version = "0.13", features = ["randr", "xfixes"] }
+zbus = "5"
+evdev = "0.13"
+objc2-core-foundation = "0.3"
+objc2-core-graphics = "0.3"
+objc2-core-audio = "0.3"
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSAppleEventDescriptor", "NSAppleEventManager", "NSString"] }
+sdl3 = { version = "0.20.0", features = ["build-from-source-static"] }
+windows = { version = "0.62", features = [
+    "ApplicationModel",
+    "Foundation_Collections",
+    "Management_Deployment",
+    "Storage",
+    "Win32_Devices_DeviceAndDriverInstallation",
+    "Win32_Devices_Display",
+    "Win32_Foundation",
+    "Win32_Security_Cryptography",
+    "Win32_Storage_FileSystem",
+    "Win32_Graphics_Gdi",
+    "Win32_Media_Audio",
+    "Win32_Media_Audio_Endpoints",
+    "Win32_System_Com",
+    "Win32_System_Console",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_IO",
+    "Win32_System_LibraryLoader",
+    "Win32_System_ProcessStatus",
+    "Win32_System_Registry",
+    "Win32_System_Threading",
+    "Win32_System_Variant",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_PropertiesSystem",
+    "Win32_UI_WindowsAndMessaging",
+] }
+windows-core = "0.62"
+windows-registry = "0.6"
+# Downloads por torrent (DL-001, ADR-0028): Apache-2.0; sem TLS nativo (rustls) e sem API HTTP (o UPnP é desativado em tempo de execução).
+librqbit = { version = "9", default-features = false, features = ["rust-tls"] }
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time"] }
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+unwrap_used = "warn"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"

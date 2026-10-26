@@ -1,0 +1,302 @@
+/* Abas: medidas do README (design/desktop/components/Abas) e do protótipo; cores do `tokens.css`.
+   `data-force="hover|focus"` só existe para a galeria mostrar o estado parado. */
+
+.tabs {
+  position: relative;
+  display: flex;
+}
+
+.tab {
+  composes: ring from "../../lib/focus.module.css";
+  position: relative;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background-color: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-text);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color var(--tempo-hover) var(--curva-estado),
+    background-color var(--tempo-hover) var(--curva-estado),
+    text-shadow var(--tempo-hover) var(--curva-estado);
+}
+
+/* ---- Barra de cima: caixa alta, sublinhado em tentáculo ---- */
+
+.topo {
+  align-self: stretch;
+  gap: 22px;
+  height: 100%;
+}
+
+.topo .tab {
+  height: 100%;
+  padding: 0 var(--space-6) 0 calc(var(--space-6) + 0.32em);
+  border-radius: var(--radius-control);
+  font-family: var(--font-heading);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--text) 45%, transparent);
+}
+
+.topo .tab:hover,
+.topo .tab[data-force="hover"] {
+  color: color-mix(in srgb, var(--text) 80%, transparent);
+}
+
+.topo .selected,
+.topo .tab:focus-visible,
+.topo .tab[data-force="focus"] {
+  color: var(--text);
+  font-weight: 500;
+  text-shadow: 0 0 14px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+/* O foco da barra de cima é o brilho do texto e o sublinhado, não o anel (README do design system). */
+.topo .tab:focus-visible,
+.topo .tab[data-force="focus"] {
+  background-image: none;
+  box-shadow: none;
+  text-shadow: 0 0 12px var(--glass-edge-strong);
+}
+
+.topo .tab::after {
+  content: "";
+  position: absolute;
+  left: var(--space-4);
+  right: var(--space-4);
+  bottom: 9px;
+  height: 3px;
+  border-radius: 3px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--accent) 22%,
+    color-mix(in srgb, var(--accent) 70%, var(--text)) 50%,
+    var(--accent) 78%,
+    transparent
+  );
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 70%, transparent);
+  opacity: 0;
+  transform: scaleX(0);
+  transition:
+    transform var(--tempo-pagina) var(--curva-entrada),
+    opacity var(--tempo-estado) var(--curva-estado);
+}
+
+.topo .tab:hover::after,
+.topo .tab[data-force="hover"]::after {
+  opacity: 0.45;
+  transform: scaleX(0.35);
+}
+
+.topo .tab:focus-visible::after,
+.topo .tab[data-force="focus"]::after {
+  opacity: 0.8;
+  transform: scaleX(0.6);
+}
+
+.topo .selected::after {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+.topo .selected::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 70%;
+  height: 22px;
+  transform: translateX(-50%);
+  background: radial-gradient(50% 100% at 50% 100%, color-mix(in srgb, var(--accent) 22%, transparent), transparent);
+  pointer-events: none;
+}
+
+/* ---- Lista (Todos · Favoritos · Instalados): TAKO = texto sobre uma linha; outros temas = trilho ---- */
+
+.lista {
+  /* Cinza claro do texto, sem cor da paleta (README: "cinza claro aqui"). */
+  --abas-tom: color-mix(in srgb, var(--text) 85%, var(--canvas));
+  gap: 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+.lista .tab {
+  flex: 1;
+  height: 36px;
+  font-family: var(--font-heading);
+  font-size: 12.5px;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  color: color-mix(in srgb, var(--text) 50%, transparent);
+}
+
+.lista .tab:hover,
+.lista .tab[data-force="hover"] {
+  color: color-mix(in srgb, var(--text) 85%, transparent);
+}
+
+.lista .selected {
+  background-image: radial-gradient(60% 80% at 50% 100%, color-mix(in srgb, var(--abas-tom) 14%, transparent), transparent);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.lista .tab::after {
+  content: "";
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--abas-tom) 25%, var(--abas-tom) 75%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--abas-tom) 70%, transparent);
+  opacity: 0;
+  transform: scaleX(0);
+  transition:
+    transform var(--tempo-pagina) var(--curva-entrada),
+    opacity var(--tempo-estado) var(--curva-estado);
+}
+
+.lista .selected::after {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+/* Fora do TAKO: trilho de 4 com o item atual destacado. */
+:global(:root[data-theme]:not([data-theme="tako"])) .lista {
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  background: var(--glass-control);
+}
+
+:global(:root[data-theme]:not([data-theme="tako"])) .lista .tab {
+  height: 32px;
+  border-radius: var(--radius-tab, 8px);
+  font-family: var(--font-text);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--text-muted);
+}
+
+:global(:root[data-theme]:not([data-theme="tako"])) .lista .tab:hover,
+:global(:root[data-theme]:not([data-theme="tako"])) .lista .tab[data-force="hover"] {
+  color: var(--text);
+}
+
+:global(:root[data-theme]:not([data-theme="tako"])) .lista .selected {
+  background-color: var(--settings-control-hover);
+  background-image: none;
+  box-shadow: inset 0 0 0 1px var(--glass-item-edge);
+  color: var(--text);
+}
+
+:global(:root[data-theme]:not([data-theme="tako"])) .lista .tab::after {
+  display: none;
+}
+
+/* ---- Loja (Descobrir · Explorar · Lista de desejos): botões de 36 ---- */
+
+.loja {
+  gap: var(--space-4);
+}
+
+.loja .tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: var(--control-height);
+  padding: 0 14px;
+  border-radius: var(--radius-control);
+  font-family: var(--font-heading);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.loja .tab:hover,
+.loja .tab[data-force="hover"] {
+  color: var(--text);
+}
+
+.loja .selected {
+  background-color: var(--settings-control-hover);
+  color: var(--text);
+}
+
+.count {
+  padding: 1px var(--space-6);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text) 5%, var(--settings-control-hover));
+  color: color-mix(in srgb, var(--text) 80%, transparent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* ---- Segmentado (Populares · Mais baixados…): trilho com a pílula branca que desliza ---- */
+
+.segmentado {
+  --abas-pill-base: 100px;
+  align-self: flex-start;
+  padding: var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-row);
+  background: var(--glass-control);
+}
+
+.segmentado .tab {
+  z-index: 1;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--radius-thumb);
+  font-size: 12.5px;
+  font-weight: 500;
+  transition: color var(--tempo-estado) var(--curva-estado);
+}
+
+.segmentado .tab:hover,
+.segmentado .tab[data-force="hover"] {
+  color: var(--text);
+}
+
+.segmentado .selected,
+.segmentado .selected:hover {
+  color: var(--on-primary);
+}
+
+/* A pílula tem largura fixa e cresce ou encolhe por `scaleX`; só `transform` anima. */
+.pill {
+  position: absolute;
+  top: var(--space-4);
+  bottom: var(--space-4);
+  left: 0;
+  width: var(--abas-pill-base);
+  border-radius: var(--radius-thumb);
+  background: var(--primary);
+  transform-origin: left center;
+}
+
+.ready .pill {
+  transition: transform var(--tempo-entrada) var(--curva-entrada);
+}
+
+/* (O `:not([data-glass="off"])` iguala a força das regras "fora do TAKO" acima, para estas valerem.) */
+/* Liquid Glass: o trilho é um controle de vidro e a aba atual, o vidro escolhido (protótipo, `.sb-tabs`). */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .lista {
+  border-color: var(--vidro-control-edge);
+  box-shadow: var(--vidro-spec);
+  backdrop-filter: var(--vidro-control-blur);
+}
+
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .lista .selected {
+  background-color: var(--glass-selected);
+  box-shadow: var(--vidro-selected-spec);
+}

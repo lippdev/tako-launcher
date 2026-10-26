@@ -1,0 +1,427 @@
+/* Base da interface: reinício mínimo, medidas que o `tokens.css` não traz e as opções de acessibilidade.
+   Tudo o mais vem das variáveis do `tokens.css`. */
+
+:root {
+  /* Medidas do README do design system ("Ícones" e "Marca") sem variável no `tokens.css`. */
+  --icon-size: 18px;
+  --icon-size-sm: 15px;
+  --icon-stroke: 1.7;
+  --brand-mark-width: 50px;
+  --brand-mark-height: 40px;
+  --brand-word-width: 68px;
+  --brand-word-height: 14px;
+  --brand-kana-width: 46px;
+  --brand-kana-height: 8px;
+  --brand-kana-opacity: 0.85;
+  --brand-glow-blur: 8px;
+  /* "Tamanho da interface": 0,9 / 1 / 1,1 / 1,25, escrita por `applyAppearance`. */
+  --ui-scale: 1;
+  /* Barra de rolagem: 10 de área, pílula de 4 (3 de folga de cada lado). */
+  --scrollbar-size: 10px;
+  --scrollbar-inset: 3px;
+
+  /* GrupoDeBlocos (README: bloco com valor de 78 e faixa de rótulo de 40; protótipo: bloco fixo de 132 e barras da semana). */
+  --tile-value-height: 78px;
+  --tile-label-height: 40px;
+  --tile-fixed-width: 132px;
+  --tile-icon-size: 19px;
+  --tile-cover-width: 90px;
+  --bar-width: 10px;
+  --bar-height: 36px;
+  --bar-gap: 5px;
+  --bar-radius: 5px;
+
+  /* LinhaDeConfiguracao (README: mínimo 64, padding 12 14 12 18). `--settings-row-height` vem do tokens.css. */
+  --setting-row-padding: 12px 14px 12px 18px;
+  --setting-row-gap: 20px;
+
+  /* Chave (46×28, bolinha de 22) e ControleDeslizante (trilho 180×4, bolinha de 18, valor à direita). */
+  --switch-width: 46px;
+  --switch-height: 28px;
+  --switch-thumb: 22px;
+  --switch-inset: 3px;
+  --slider-width: 180px;
+  --slider-track-height: 4px;
+  --slider-thumb: 18px;
+  --slider-hit-height: 24px;
+  --slider-value-width: 42px;
+  /* Trilho vazio do deslizante e chave desligada: `g2a` do protótipo (sem variável no tokens.css). */
+  --control-track: #2a2a31;
+  --thumb-shadow: 0 2px 6px #00000066;
+
+  /* PainelLateral (README: 400, 480 nas configurações do jogo; véu 50% com desfoque 3). */
+  --drawer-width: 400px;
+  --drawer-width-wide: 480px;
+  --scrim: #00000080;
+  --scrim-blur: 3px;
+  --shadow-drawer: -30px 0 60px #00000066;
+  --z-scrim: 30;
+  --z-layer: 31;
+
+  /* ListaDeJogos (README: linha de 42, ícone de 28; recolhida: ícone de 46). O espaço entre linhas vem do protótipo. */
+  --list-row-height: 42px;
+  --list-row-gap: 2px;
+  --list-row-height-collapsed: 52px;
+  --list-row-gap-collapsed: 4px;
+  --list-icon-size: 28px;
+  --list-icon-size-collapsed: 46px;
+  --list-check-size: 16px;
+  --list-dot-size: 8px;
+  --list-progress-height: 3px;
+  /* Blocos de espera do EstadoCarregando: branco 6%, pulsando em 1,6 s. */
+  --skeleton: color-mix(in srgb, var(--text) 6%, transparent);
+  --tempo-pulso: 1600ms;
+
+  /* EntradaDoApp (BRAND-002, README do EntradaDoApp / MovimentoBase) */
+  --intro-mark-width: 80px;
+  --intro-mark-height: 64px;
+  --intro-word-width: 108px;
+  --intro-word-height: 22px;
+  --intro-kana-width: 72px;
+  --intro-kana-height: 12px;
+  --intro-glow-blur: 16px;
+  --intro-gap: 16px;
+  --tempo-intro-hold: 350ms;
+  --tempo-intro-escada: 70ms;
+  --intro-preview-width: 1600px;
+  --intro-preview-height: 900px;
+  --intro-z: 100;
+  --intro-card-width: 180px;
+  --intro-card-height: 240px;
+  --intro-title-size: 32px;
+}
+
+/* Trilho do deslizante e chave desligada nos outros temas: o cinza neutro do protótipo; no Liquid Glass, branco translúcido. */
+[data-theme="escuro"],
+[data-theme="meia-noite"],
+[data-theme="oled"] {
+  --control-track: #2a2a2a;
+}
+
+[data-theme="vidro"] {
+  --control-track: #ffffff24;
+  /* Material do Liquid Glass (protótipo, `.tk.theme-glass`): reflexo no topo e sombra embaixo (`--spec`), controles
+     de vidro (branco 10% com contorno 16% e desfoque) e o item escolhido (12%, contorno 14%, reflexo 16%). */
+  --vidro-spec: inset 0 1px 0 #ffffff24, inset 0 -1px 0 #0000002e;
+  --vidro-control-edge: #ffffff29;
+  --vidro-control-hover: #ffffff2b;
+  --vidro-control-blur: blur(var(--glass-blur)) saturate(160%);
+  --vidro-selected-edge: #ffffff24;
+  --vidro-selected-spec: inset 0 1px 0 #ffffff29;
+  --vidro-row-hover: #ffffff12;
+  /* Contorno da linha escolhida da lista: mais discreto que o dos controles (6%). */
+  --vidro-row-edge: #ffffff0f;
+  --vidro-primary: linear-gradient(180deg, #fffffff7, #e4e8f0eb);
+  --vidro-primary-edge: #ffffffe6;
+  /* Só o reflexo no topo: o brilho de 30 do protótipo vazava para os botões ao lado. */
+  --vidro-primary-shadow: inset 0 1px 0 #ffffff;
+  --vidro-chip-edge: #ffffff26;
+  --vidro-primary-chip: #0d0d0d;
+  /* Grupos e cartões (`.box`, `.tiles-group`, `.set-group`): vidro com reflexo e sombra suave. */
+  --vidro-group-edge: #ffffff21;
+  --vidro-group-shadow: var(--vidro-spec), 0 12px 40px #0000002e;
+  --vidro-group-blur: blur(var(--glass-blur)) saturate(160%);
+  /* Camadas (menu, popover, gaveta, diálogo, busca, dica): desfoque 34 e sombra funda. */
+  --vidro-layer-edge: #ffffff24;
+  --vidro-layer-blur: blur(34px) saturate(180%);
+  --vidro-layer-shadow: var(--vidro-spec), 0 30px 80px #00000073;
+  /* Coluna da lista e das configurações: branco a 55% da opacidade das superfícies, linha de 9% à direita. */
+  --vidro-side: color-mix(in srgb, var(--group) 55%, transparent);
+  --vidro-side-edge: #ffffff17;
+  /* Bloco dentro de grupo e chave desligada. */
+  --vidro-tile-edge: #ffffff14;
+  --vidro-tile-spec: inset 0 1px 0 #ffffff14;
+  --vidro-switch-off: #ffffff24;
+  --vidro-switch-shadow: inset 0 1px 2px #0000004d;
+  --vidro-icon-bg: #ffffff14;
+}
+
+/* Camadas, avisos e controles (WEB-04a): valores do README/protótipo que o `tokens.css` não tem. */
+:root {
+  /* Entrada de diálogo e aviso (350 ms, TrocaDePopup e Aviso), pílula das Abas e busca da loja. */
+  --tempo-entrada: 350ms;
+  /* Véu do diálogo: preto a 60% com desfoque de 8 (README do Dialogo). */
+  --veil: #00000099;
+  --veil-blur: 8px;
+  /* Primário no hover: "branco puro" (README do BotaoDesktop). */
+  --primary-hover: #ffffff;
+  /* Fundo do Aviso: claro. `#f6efed` no tema TAKO, o primário nos outros (README do Aviso). */
+  --toast-bg: #f6efed;
+  /* Controle desabilitado. */
+  --disabled-opacity: 0.45;
+}
+[data-theme="escuro"],
+[data-theme="meia-noite"],
+[data-theme="oled"],
+[data-theme="vidro"],
+[data-theme="solido"] {
+  --toast-bg: var(--primary);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /* Todas as medidas são px; `zoom` escala a interface inteira de uma vez (Chromium). Quem precisar
+     da altura da janela usa `100%`, não `100vh`: o `vh` não acompanha o zoom. */
+  zoom: var(--ui-scale);
+  background: var(--canvas);
+  color: var(--text);
+  font-family: var(--font-text);
+  -webkit-font-smoothing: antialiased;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--canvas);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Efeitos de vidro desligados: nenhum `backdrop-filter` em lugar nenhum. */
+[data-glass="off"],
+[data-glass="off"] * {
+  backdrop-filter: none !important;
+}
+
+/* Reduzir animações: zera durações e atrasos (as variáveis e, por garantia, tudo o que as ignora).
+   Vale para a opção do Tako e para o pedido do sistema. */
+:root[data-reduce-motion="true"] {
+  --tempo-hover: 0ms;
+  --tempo-foco: 0ms;
+  --tempo-estado: 0ms;
+  --tempo-entrada: 0ms;
+  --tempo-pagina: 0ms;
+  --tempo-saida: 0ms;
+  --tempo-troca: 0ms;
+  --tempo-escada: 0ms;
+  --tempo-lista: 0ms;
+  --tempo-arte: 0ms;
+  --tempo-destaque: 0ms;
+  --tempo-cor: 0ms;
+  --tempo-carrossel: 0ms;
+  --tempo-contador: 0ms;
+  --tempo-radar: 0ms;
+  --tempo-pulso: 0ms;
+  --tempo-cover: 0ms;
+  --tempo-intro-hold: 0ms;
+  --tempo-intro-escada: 0ms;
+  --tempo-pop: 0ms;
+  --tempo-popover: 0ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --tempo-hover: 0ms;
+    --tempo-foco: 0ms;
+    --tempo-estado: 0ms;
+    --tempo-entrada: 0ms;
+    --tempo-pagina: 0ms;
+    --tempo-saida: 0ms;
+    --tempo-troca: 0ms;
+    --tempo-escada: 0ms;
+    --tempo-lista: 0ms;
+    --tempo-arte: 0ms;
+    --tempo-destaque: 0ms;
+    --tempo-cor: 0ms;
+    --tempo-carrossel: 0ms;
+    --tempo-contador: 0ms;
+    --tempo-radar: 0ms;
+    --tempo-pulso: 0ms;
+    --tempo-cover: 0ms;
+    --tempo-intro-hold: 0ms;
+    --tempo-intro-escada: 0ms;
+    --tempo-pop: 0ms;
+    --tempo-popover: 0ms;
+  }
+}
+
+:root[data-reduce-motion="true"] *,
+:root[data-reduce-motion="true"] *::before,
+:root[data-reduce-motion="true"] *::after {
+  animation-duration: 0ms !important;
+  animation-delay: 0ms !important;
+  transition-duration: 0ms !important;
+  transition-delay: 0ms !important;
+  scroll-behavior: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Componentes do jogo (WEB-04c): CapaDoJogo, PilulaDaLoja, StatusDoJogo e EtiquetasDoJogo */
+:root {
+  /* CapaDoJogo: proporção 2:3 da Steam, zoom de 1.05 e 700 ms suave (README do CapaDoJogo) */
+  --cover-aspect-ratio: 2 / 3;
+  --cover-zoom: 1.05;
+  --cover-brightness: 1.08;
+  --tempo-cover: 700ms;
+  /* Contorno interno da CapaDoJogo (README do CapaDoJogo: 1px branco a 6%) */
+  --cover-border: rgba(255, 255, 255, 0.06);
+  /* Sombra de texto sobre a arte da CapaDoJogo (README do CapaDoJogo / protótipo) */
+  --cover-text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+
+  /* PilulaDaLoja e chips (README da PilulaDaLoja e EtiquetasDoJogo): altura de 32, raio de 9 e versão compacta de 26 */
+  --chip-height: 32px;
+  --chip-height-sm: 26px;
+  --chip-padding: 0 12px;
+  --chip-padding-sm: 0 8px;
+  --chip-font-size: 12.5px;
+  --chip-font-size-sm: 11.5px;
+  --chip-gap: 8px;
+  --chip-bg: rgba(10, 10, 10, 0.65);
+  --chip-bg-hover: rgba(30, 30, 30, 0.8);
+  --chip-dot-size: 8px;
+
+  /* Cores de situação do jogo (StatusDoJogo, README do design system) */
+  --status-playing: #3ddc84;
+  --status-completed: #4d9bff;
+  --status-queued: #b388ff;
+  --status-paused: #ffcf4d;
+  --status-dropped: #ff6b6b;
+  --status-none: #888888;
+}
+
+/* Componentes ErroDoJogo e AtualizacaoDoApp (WEB-04f): medidas e espaçamentos dos diálogos da prévia */
+:root {
+  --space-10: 10px;
+  --space-14: 14px;
+  --space-18: 18px;
+  --space-20: 20px;
+  --erro-dialogo-largura: 540px;
+  --erro-capa-tamanho: 44px;
+  --erro-capa-radius: 8px;
+  --erro-ponto-tamanho: 12px;
+  --erro-ponto-offset: -3px;
+  --erro-ponto-borda: 2px;
+  --atualizacao-dialogo-largura: 480px;
+  --atualizacao-progresso-altura: 6px;
+}
+
+/* AtividadeNaBarra e PainelDownloads (WEB-04e, README do AtividadeNaBarra e PainelDownloads) */
+:root {
+  /* AtividadeNaBarra: botão da barra de ferramentas (README do AtividadeNaBarra: 36×36, raio 9) */
+  --tb-btn-height: 36px;
+  --tb-btn-min-width: 36px;
+  --tb-btn-radius: 9px;
+  --tb-btn-padding: 0 9px;
+  --tb-btn-font-size: 13px;
+
+  /* AtividadeNaBarra: contador (README do AtividadeNaBarra: bolinha de 19 na cor de destaque, borda 2 na cor da barra, pula escala 1.35 em 400ms) */
+  --badge-size: 19px;
+  --badge-border: 2px;
+  --badge-radius: 10px;
+  --badge-text-color: #ffffff;
+  --badge-top: -5px;
+  --badge-right: -5px;
+  --tempo-pop: 400ms;
+
+  /* PainelDownloads: popover (README do PainelDownloads: largura 340, raio 14, contorno line-strong, shadow-float, entrada 300ms) */
+  --dl-panel-width: 340px;
+  --dl-panel-radius: 14px;
+  --dl-panel-padding: 8px;
+  --dl-panel-offset: -6px;
+  --tempo-popover: 300ms;
+
+  /* PainelDownloads: capa na linha de download (README do PainelDownloads: 36×46, raio de 5) */
+  --dl-cover-width: 36px;
+  --dl-cover-height: 46px;
+  --dl-cover-radius: 5px;
+
+  /* PainelDownloads: botão de ação da linha (README do PainelDownloads: 30×30, raio 8, ícone de 14) */
+  --dl-action-size: 30px;
+  --dl-action-radius: 8px;
+  --dl-action-icon-size: 14px;
+
+  /* PainelDownloads: barra de progresso (README do PainelDownloads: altura de 3 na cor de destaque) */
+  --dl-progress-height: 3px;
+}
+
+/* Componentes CampoDeTexto e SeletorDeImagens (WEB-04g): medidas e superfícies dos componentes */
+:root {
+  /* CampoDeTexto: altura 44 (README do CampoDeTexto e protótipo) */
+  --campo-texto-altura: 44px;
+  --campo-texto-radius: var(--radius-control);
+  --campo-texto-fundo: color-mix(in srgb, var(--text) 3.5%, transparent);
+  --campo-texto-fundo-hover: color-mix(in srgb, var(--text) 5.5%, transparent);
+  --campo-texto-fundo-foco: color-mix(in srgb, var(--text) 5%, transparent);
+  --campo-texto-borda: var(--line);
+  --campo-texto-borda-hover: var(--line-strong);
+  --campo-texto-borda-foco: color-mix(in srgb, var(--text) 30%, transparent);
+
+  /* SeletorDeImagens (README do SeletorDeImagens e protótipo): diálogo largo de 1180, prévia de 300 */
+  --seletor-dialogo-largura: 1180px;
+  --seletor-previa-largura: 300px;
+  --seletor-grade-colunas: 6;
+  --seletor-grade-gap: 12px;
+  --seletor-capa-tamanho: 44px;
+  --seletor-capa-radius: 8px;
+  --seletor-opcao-radius: 10px;
+  --seletor-opcao-borda: color-mix(in srgb, var(--text) 7%, transparent);
+  --seletor-opcao-borda-foco: var(--text);
+  --seletor-badge-fundo: color-mix(in srgb, var(--accent) 25%, var(--surface-raised));
+  --seletor-badge-cor: var(--accent);
+}
+
+/* Navegação por direção (WEB-05a): o elemento que recebe o foco entra na tela com folga, para o anel e o brilho
+   (`focus-ring-width`) não ficarem cortados na borda de quem rola. */
+:where(a[href], button, input, select, textarea, [tabindex]) {
+  scroll-margin: var(--space-20);
+}
+
+/* Barra de rolagem do Tako, em toda área que rola: trilho invisível e uma pílula fina que clareia sob o mouse.
+   As áreas não declaram barra própria (só `scrollbar-width: none` onde ela some). */
+::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  /* A borda transparente afasta a pílula da beirada sem mudar a área de rolagem. */
+  border: var(--scrollbar-inset) solid transparent;
+  border-radius: var(--radius-full);
+  background: var(--line-strong) padding-box;
+  min-height: 40px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-dim);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--text-muted);
+}
+
+::-webkit-scrollbar-button {
+  display: none;
+}

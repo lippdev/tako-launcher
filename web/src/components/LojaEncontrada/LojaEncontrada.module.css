@@ -1,0 +1,123 @@
+/* Medidas do LojaEncontrada (design/desktop/components/LojaEncontrada/README.md) */
+.group {
+  --onboarding-store-row-height: 58px;
+  --onboarding-store-icon-size: 28px;
+  --onboarding-store-icon-radius: 7px;
+  --onboarding-store-dot-size: 8px;
+
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-card);
+  width: 100%;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--setting-row-gap);
+  width: 100%;
+  min-height: var(--onboarding-store-row-height);
+  padding: var(--setting-row-padding);
+  box-sizing: border-box;
+  text-align: left;
+  transition: background-color var(--tempo-hover) var(--curva-estado);
+}
+
+.row + .row {
+  border-top: 1px solid var(--line);
+}
+
+.row:hover {
+  background: color-mix(in srgb, var(--text) 2%, transparent);
+}
+
+.notInstalled {
+  opacity: 0.5;
+}
+
+.iconWrapper {
+  width: var(--onboarding-store-icon-size);
+  height: var(--onboarding-store-icon-size);
+  border-radius: var(--onboarding-store-icon-radius);
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--text);
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.details {
+  display: block;
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.control {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* Estado: pronto */
+.readyChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text);
+}
+
+.statusDot {
+  width: var(--onboarding-store-dot-size);
+  height: var(--onboarding-store-dot-size);
+  border-radius: 50%;
+  background: var(--success);
+  flex-shrink: 0;
+}
+
+/* Estado: falta algo */
+.missingContainer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.warningAlert {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--warning);
+}
+
+/* Estado: não instalado */
+.dimText {
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row {
+    transition: none;
+  }
+}

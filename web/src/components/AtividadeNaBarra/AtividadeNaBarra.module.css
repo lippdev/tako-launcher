@@ -1,0 +1,98 @@
+/* AtividadeNaBarra: botão de downloads da barra de ferramentas (README do AtividadeNaBarra) */
+
+.btn {
+  composes: ring from "../../lib/focus.module.css";
+  height: var(--tb-btn-height);
+  min-width: var(--tb-btn-min-width);
+  padding: var(--tb-btn-padding);
+  border-radius: var(--tb-btn-radius);
+  /* Igual às outras ações da barra (BarraSuperior .action): sem fundo nem contorno próprios. */
+  border: 1px solid transparent;
+  background-color: transparent;
+  color: color-mix(in srgb, var(--text) 62%, transparent);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-8);
+  font-family: var(--font-text);
+  font-size: var(--tb-btn-font-size);
+  cursor: pointer;
+  outline: none;
+  transition: color var(--tempo-hover) var(--curva-estado);
+}
+
+/* Sublinhado que brilha, como nas outras ações da barra. */
+.btn::after {
+  content: "";
+  position: absolute;
+  left: 30%;
+  right: 30%;
+  bottom: 1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+  opacity: 0;
+  transform: scaleX(0.3);
+  transition:
+    opacity var(--tempo-estado) var(--curva-estado),
+    transform var(--tempo-entrada) var(--curva-entrada);
+  pointer-events: none;
+}
+
+.btn:hover,
+.btn[data-force="hover"],
+.btn[data-force="pressed"],
+.btn:active,
+.btn.aberto {
+  color: var(--text);
+  background-image: radial-gradient(70% 90% at 50% 100%, color-mix(in srgb, var(--accent) 16%, transparent), transparent);
+}
+
+.btn:hover::after,
+.btn[data-force="hover"]::after,
+.btn.aberto::after {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+.pct {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.badge {
+  position: absolute;
+  top: var(--badge-top);
+  right: var(--badge-right);
+  min-width: var(--badge-size);
+  height: var(--badge-size);
+  border-radius: var(--badge-radius);
+  background: var(--accent);
+  color: var(--badge-text-color);
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  padding: 0 var(--space-4);
+  border: var(--badge-border) solid var(--titlebar);
+  line-height: 1;
+  pointer-events: none;
+}
+
+.pop {
+  animation: tk-pop var(--tempo-pop) var(--ease);
+}
+
+@keyframes tk-pop {
+  40% {
+    transform: scale(1.35);
+  }
+}

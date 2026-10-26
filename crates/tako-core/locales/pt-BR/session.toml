@@ -1,0 +1,21 @@
+[session.screen]
+not_connected = "a tela de jogo escolhida não está conectada"
+none_chosen = "escolha a tela de jogo em Configurações"
+no_hdr = "HDR não disponível em {screen}"
+did_not_wake = "{screen} não ligou"
+read_failed = "não foi possível ler as telas"
+already_active = "a tela de jogo já está em foco"
+managed = "a resolução é definida pela sessão (gamescope)"
+
+[session.exit]
+code = "Código de saída {code}"
+dll_not_found = "uma DLL que o jogo precisa não foi encontrada (instale o Visual C++ e o DirectX, ou repare os arquivos do jogo)"
+entry_point = "uma DLL do jogo é de outra versão (atualize o Visual C++ e o DirectX, ou repare os arquivos do jogo)"
+dll_init = "uma DLL não conseguiu iniciar (reinstale o Visual C++ e o DirectX; antivírus ou sobreposições também causam isso)"
+access_violation = "o jogo acessou uma memória que não podia e caiu (mods, sobreposições, driver de vídeo ou arquivos corrompidos)"
+bad_image = "o jogo ou uma DLL é de outra arquitetura, por exemplo uma DLL de 32 bits num jogo de 64 bits (reinstale o Visual C++ x86 e x64 ou repare os arquivos)"
+illegal_instruction = "o processador não tem uma instrução que o jogo exige (por exemplo, AVX)"
+stack_overflow = "o jogo caiu por estouro de pilha (erro do próprio jogo ou de um mod)"
+heap_corruption = "o jogo corrompeu a própria memória e caiu (mods ou sobreposições costumam causar)"
+fail_fast = "o jogo encontrou um erro grave e se fechou (mods, sobreposições ou arquivos corrompidos)"
+no_memory = "faltou memória para o jogo"

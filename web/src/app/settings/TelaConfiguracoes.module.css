@@ -1,0 +1,150 @@
+/* README da TelaConfiguracoes: categorias à esquerda (292), conteúdo à direita (até 900). O cabeçalho é um ícone
+   de 52, o título 28/700 e uma frase; abaixo, as seções com rótulo em caixa alta e grupos de linhas. */
+
+.screen {
+  display: flex;
+  height: 100%;
+}
+
+.nav {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: var(--list-width);
+  padding: 14px var(--space-12) var(--space-12);
+  overflow-y: auto;
+  border-right: 1px solid var(--line);
+  background: var(--titlebar);
+  scrollbar-width: none;
+}
+
+.meta {
+  margin: 0;
+  padding: var(--space-12) var(--space-6) var(--space-8);
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.body {
+  max-width: 900px;
+  padding: 34px var(--space-40) 70px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-16);
+  margin-bottom: 30px;
+}
+
+.headIcon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--tile);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.description {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: 13.5px;
+}
+
+.sections {
+  display: grid;
+  gap: 26px;
+}
+
+.soon {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13.5px;
+}
+
+.progress {
+  margin: var(--space-8) var(--space-4) 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+.progress:empty {
+  margin: 0;
+}
+
+/* A categoria entra em escada: cabeçalho e seções sobem 10 e aparecem, uma depois da outra. Só `transform` e
+   `opacity`; "Reduzir animações" zera a duração e o atraso (base.css). */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.head,
+.sections > * {
+  animation: rise var(--tempo-pagina) var(--curva-entrada) both;
+}
+
+.sections > :nth-child(1) {
+  animation-delay: calc(var(--tempo-escada) * 1);
+}
+
+.sections > :nth-child(2) {
+  animation-delay: calc(var(--tempo-escada) * 2);
+}
+
+.sections > :nth-child(3) {
+  animation-delay: calc(var(--tempo-escada) * 3);
+}
+
+.sections > :nth-child(n + 4) {
+  animation-delay: calc(var(--tempo-escada) * 4);
+}
+
+/* O texto do aviso legal dos downloads: os parágrafos vêm separados por linha em branco. */
+.legal {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  white-space: pre-line;
+}
+
+/* Liquid Glass (protótipo, `.set-nav` e `.set-head .hic`): a coluna como a da lista; o ícone do cabeçalho em vidro. */
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .nav {
+  border-right-color: var(--vidro-side-edge);
+  background: var(--vidro-side);
+  backdrop-filter: var(--vidro-group-blur);
+}
+
+:global(:root[data-theme="vidro"]:not([data-glass="off"])) .headIcon {
+  border-color: var(--vidro-group-edge);
+  background: var(--group);
+  box-shadow: var(--vidro-group-shadow);
+  backdrop-filter: var(--vidro-group-blur);
+}

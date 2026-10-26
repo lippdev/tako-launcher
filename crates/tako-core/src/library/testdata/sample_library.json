@@ -1,0 +1,378 @@
+{
+  "version": 1,
+  "games": [
+    {
+      "id": "control",
+      "title": "CONTROL Resonant",
+      "store": "Epic",
+      "sizeLabel": "120 GB",
+      "accent": "#7E2429",
+      "coverUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3669870/7d4b4f430dc4d07e6562eb445456f9615cb52f77/library_capsule_2x.jpg?t=1791013569",
+      "heroUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3669870/6800d1c970b28815caa97e694ce811ca090f82e2/library_hero_2x.jpg?t=1791013569",
+      "genres": [
+        "Ação",
+        "Aventura"
+      ],
+      "description": "Explore uma Manhattan distorcida à beira da aniquilação paranatural neste emocionante RPG de ação e aventura. Liberte os poderes extraordinários de Dylan Faden na luta pela própria humanidade e pela nossa sobrevivência contra uma ameaça cósmica capaz de distorcer a realidade.",
+      "releaseDate": "2026-09-24",
+      "lastPlayedDaysAgo": 1,
+      "playTimeHours": 14,
+      "isInstalled": true,
+      "isFavorite": true,
+      "addedDaysAgo": 1
+    },
+    {
+      "id": "phantom",
+      "title": "Phantom Blade Zero",
+      "store": "Steam",
+      "accent": "#2B3A55",
+      "coverUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4115450/471e77854910665c03eb9a53ad06f2ac12903acd/library_capsule_2x.jpg?t=1787142639",
+      "heroUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4115450/1cd52ca84a3d974c4206e9cb90231956324c5999/library_hero_2x.jpg?t=1787142639",
+      "genres": [
+        "Ação",
+        "RPG"
+      ],
+      "description": "A S-GAME apresenta Phantom Blade Zero, uma união da narrativa Wuxia com a ação impulsionada pela Unreal Engine 5. Como Soul, você tem só sessenta e seis dias de vida para derrotar assassinos, desvendar conspirações perigosas e defender seus valores com a sua vida.",
+      "upcomingRelease": "2026-10-29",
+      "playTimeHours": 0,
+      "isInstalled": false,
+      "isFavorite": false,
+      "addedDaysAgo": 2
+    },
+    {
+      "id": "fc27",
+      "title": "EA SPORTS FC 27",
+      "store": "Steam",
+      "sizeLabel": "100 GB",
+      "accent": "#5A7E24",
+      "coverUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4080220/81210d536b70c14e4cf9725f3f03d82bf64e5e25/library_capsule_2x.jpg?t=1790973254",
+      "heroUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4080220/98909665528dc40a7d43fd3dd6edc8088ed98c44/library_hero_2x.jpg?t=1790973254",
+      "genres": [
+        "Simulação",
+        "Esportes"
+      ],
+      "description": "Boas-vindas ao EA SPORTS FC™ 27 - O Jogo de Todo Mundo. Entre no The Grounds, o ponto de encontro do futebol e sinta mais controle em todos os modos, enquanto inovações impulsionadas pela comunidade proporcionam uma jogabilidade ainda mais fiel ao futebol.",
+      "releaseDate": "2026-09-24",
+      "lastPlayedDaysAgo": 2,
+      "playTimeHours": 31,
+      "isInstalled": true,
+      "isFavorite": false,
+      "addedDaysAgo": 3
+    },
+    {
+      "id": "bloodborne",
+      "title": "Bloodborne",
+      "store": "Manual",
+      "accent": "#861D1D",
+      "coverUrl": "https://upload.wikimedia.org/wikipedia/en/6/68/Bloodborne_Cover_Wallpaper.jpg",
+      "heroUrl": "https://image.api.playstation.com/cdn/EP9000/CUSA00207_00/FREE_CONTENTqTph7aohFHoFoDDgHrpm/Bloodborne_1.jpg",
+      "heroAlignment": "50% 40%",
+      "genres": [
+        "Ação",
+        "RPG"
+      ],
+      "description": "Explore Yharnam, uma cidade gótica tomada por uma doença misteriosa, em combates rápidos e agressivos criados pela FromSoftware.",
+      "note": "Port não oficial (bbport), feito por fãs. Requer os arquivos do seu próprio jogo.",
+      "lastPlayedDaysAgo": 3,
+      "playTimeHours": 22,
+      "isInstalled": true,
+      "isFavorite": true,
+      "addedDaysAgo": 4
+    },
+    {
+      "id": "gow3",
+      "title": "God of War III Remastered",
+      "store": "Manual",
+      "accent": "#8F1818",
+      "coverUrl": "https://image.api.playstation.com/vulcan/img/rnd/202011/0711/p8JCvA8692BICXAPoyylh7ed.png",
+      "heroUrl": "https://image.api.playstation.com/vulcan/img/rnd/202011/0711/p8JCvA8692BICXAPoyylh7ed.png",
+      "heroAlignment": "50% 100%",
+      "genres": [
+        "Ação",
+        "Aventura"
+      ],
+      "description": "Kratos parte em busca de vingança contra os deuses do Olimpo no capítulo final da trilogia grega.",
+      "note": "Port não oficial (gow3_pc), feito por fãs. Requer os arquivos do seu próprio jogo.",
+      "lastPlayedDaysAgo": 4,
+      "playTimeHours": 9,
+      "isInstalled": true,
+      "isFavorite": false,
+      "addedDaysAgo": 5
+    },
+    {
+      "id": "requiem",
+      "title": "Resident Evil Requiem",
+      "store": "Steam",
+      "accent": "#9E332D",
+      "coverUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3764200/ed3b2cae7d15f598f41006f5f1e605ec5517b5e4/library_capsule_2x.jpg?t=1779840172",
+      "heroUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3764200/90d7401b621e98bd61b2f66616ffafcb58d75fd7/library_hero_2x.jpg?t=1779840172",
+      "genres": [
+        "Ação",
+        "Aventura"
+      ],
+      "description": "Réquiem para os mortos. Pesadelo para os vivos. Prepare-se para escapar da morte em uma experiência aterrorizante que vai gelar sua espinha.",
+      "releaseDate": "2026-02-26",
+      "lastPlayedDaysAgo": 5,
+      "playTimeHours": 17,
+      "isInstalled": true,
+      "isFavorite": false,
+      "addedDaysAgo": 9
+    },
+    {
+      "id": "crimson",
+      "title": "Crimson Desert",
+      "store": "Steam",
+      "sizeLabel": "150 GB",
+      "accent": "#812321",
+      "coverUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3321460/85f762166594b84330761c11d3106182634c882c/library_capsule_2x.jpg?t=1789020763",
+      "heroUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3321460/fa05258232b2b970e2730d2ad5917842e914283c/library_hero_2x.jpg?t=1789020763",
+      "genres": [
+        "Ação",
+        "Aventura"
+      ],
+      "description": "Crimson Desert é um jogo de ação e aventura em mundo aberto no continente de Pywel. Junte-se a Kliff para reconstruir os Jubas Cinzentas e salvar a terra de uma ameaça iminente. Das regiões selvagens e cidades ao misterioso Abismo, forje seu caminho com batalhas e descobertas.",
+      "releaseDate": "2026-03-19",
+      "lastPlayedDaysAgo": 6,
+      "playTimeHours": 40,
+      "isInstalled": true,
+      "isFavorite": false,
+      "addedDaysAgo": 8
+    },
+    {
+      "id": "silksong",
+      "title": "Hollow Knight: Silksong",
+      "store": "Gog",
+      "sizeLabel": "8 GB",
+      "accent": "#C35731",
+      "coverUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1030300/93637c34351160eaa7d7ff0cce69cb4312abb819/library_capsule_2x.jpg?t=1776125736",
+      "heroUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1030300/70d7e70ae2fd0f8a46661d4a425cd84479dc7a61/library_hero_2x.jpg?t=1776125736",
+      "genres": [
+        "Ação",
+        "Aventura"
+      ],
+      "description": "Descubra um reino vasto e amaldiçoado em Hollow Knight: Silksong! Explore, lute e sobreviva enquanto você ascende ao pico de uma terra governada pela seda e por canções.",
+      "releaseDate": "2025-09-04",
+      "lastPlayedDaysAgo": 7,
+      "playTimeHours": 48,
+      "isInstalled": true,
+      "isFavorite": true,
+      "addedDaysAgo": 14
+    },
+    {
+      "id": "clair",
+      "title": "Clair Obscur: Expedition 33",
+      "store": "Xbox",
+      "sizeLabel": "55 GB",
+      "accent": "#2B3A55",
+      "coverUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1903340/8b21381a43ac5a535a838f723815f8fe14ceaf7c/library_600x900_2x.jpg?t=1782830877",
+      "heroUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1903340/library_hero_2x.jpg?t=1782830877",
+      "genres": [
+        "Ação",
+        "RPG"
+      ],
+      "description": "Conduza os membros da Expedição 33 em uma missão para destruir a Artífice para que ela nunca mais possa pintar a morte. Explore um mundo inspirado na Belle Époque da França e enfrente inimigos únicos neste RPG em turnos com mecânicas em tempo real.",
+      "releaseDate": "2025-04-24",
+      "lastPlayedDaysAgo": 9,
+      "playTimeHours": 61,
+      "isInstalled": true,
+      "isFavorite": true,
+      "addedDaysAgo": 16
+    },
+    {
+      "id": "bf6",
+      "title": "Battlefield 6",
+      "store": "Epic",
+      "sizeLabel": "55 GB",
+      "accent": "#BD3761",
+      "coverUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2807960/5efba891507f611d94ef6685cc2af7cd0640f55d/library_capsule_2x.jpg?t=1791925940",
+      "heroUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2807960/7165682cb6055d92bd2aafd940edbe70cb33ff6b/library_hero_2x.jpg?t=1791925940",
+      "genres": [
+        "Ação"
+      ],
+      "description": "A experiência da guerra total definitiva. Em uma guerra de tanques, jatos e enormes arsenais de combate, seu pelotão é a arma mais mortal.",
+      "releaseDate": "2025-10-10",
+      "lastPlayedDaysAgo": 14,
+      "playTimeHours": 26,
+      "isInstalled": true,
+      "isFavorite": false,
+      "addedDaysAgo": 12
+    },
+    {
+      "id": "mhwilds",
+      "title": "Monster Hunter Wilds",
+      "store": "Steam",
+      "sizeLabel": "75 GB",
+      "accent": "#104D92",
+      "coverUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2246340/e3fc16c6bc498891e952500eda05fe6462ceb9f0/library_600x900_2x.jpg?t=1787549555",
+      "heroUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2246340/6bfeb9022f014b53f7b6107aa6cd5399563cac29/library_hero_2x.jpg?t=1787549555",
+      "genres": [
+        "Ação",
+        "Aventura"
+      ],
+      "description": "A força desenfreada da natureza corre selvagem e incansável, com ambientes se transformando drasticamente de um instante para o próximo. Essa é uma história de monstros e humanos, e suas lutas para viver em harmonia em um mundo de dualidade.",
+      "releaseDate": "2025-02-27",
+      "lastPlayedDaysAgo": 21,
+      "playTimeHours": 95,
+      "isInstalled": true,
+      "isFavorite": false,
+      "addedDaysAgo": 18
+    },
+    {
+      "id": "ragnarok",
+      "title": "God of War Ragnarök",
+      "store": "Steam",
+      "sizeLabel": "190 GB",
+      "accent": "#3774BD",
+      "coverUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2322010/library_600x900_2x.jpg?t=1776465233",
+      "heroUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2322010/8886984a9a1da221a8e043908c6e4918205ef784/library_hero_2x.jpg?t=1776465233",
+      "genres": [
+        "Ação",
+        "Aventura"
+      ],
+      "description": "Kratos e Atreus embarcam numa viagem mítica em busca de respostas antes da chegada do Ragnarök — agora no PC.",
+      "releaseDate": "2024-09-19",
+      "lastPlayedDaysAgo": 30,
+      "playTimeHours": 52,
+      "isInstalled": true,
+      "isFavorite": false,
+      "addedDaysAgo": 22
+    },
+    {
+      "id": "nightreign",
+      "title": "ELDEN RING NIGHTREIGN",
+      "store": "Steam",
+      "sizeLabel": "30 GB",
+      "accent": "#2B5096",
+      "coverUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2622380/d1ee7bc631966b1a99e232a9f84af736bb298395/library_600x900_2x.jpg?t=1791488960",
+      "heroUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2622380/d3fec2085d29f131be9ff47b5aea72d360d4e453/library_hero_2x.jpg?t=1791488960",
+      "genres": [
+        "Ação",
+        "RPG"
+      ],
+      "description": "ELDEN RING NIGHTREIGN é uma aventura independente dentro do universo de ELDEN RING, feita para oferecer aos jogadores uma nova experiência de jogo reimaginando o design básico do jogo.",
+      "releaseDate": "2025-05-29",
+      "lastPlayedDaysAgo": 30,
+      "playTimeHours": 33,
+      "isInstalled": true,
+      "isFavorite": false,
+      "addedDaysAgo": 17
+    },
+    {
+      "id": "tsushima",
+      "title": "Ghost of Tsushima Versão do Diretor",
+      "store": "Steam",
+      "sizeLabel": "75 GB",
+      "accent": "#BD9A37",
+      "coverUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2215430/library_600x900_2x.jpg?t=1763409398",
+      "heroUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2215430/library_hero_2x.jpg?t=1763409398",
+      "genres": [
+        "Ação",
+        "Aventura"
+      ],
+      "description": "Uma tempestade se aproxima. Vivencie a experiência completa de Ghost of Tsushima Versão do Diretor no PC e forje seu próprio caminho neste jogo de ação e aventura de mundo aberto para descobrir suas maravilhosas surpresas. Trazido pela Sucker Punch Productions, Nixxes Software e PlayStation Studios.",
+      "releaseDate": "2024-05-16",
+      "lastPlayedDaysAgo": 60,
+      "playTimeHours": 70,
+      "isInstalled": true,
+      "isFavorite": false,
+      "addedDaysAgo": 25
+    },
+    {
+      "id": "ds2",
+      "title": "DEATH STRANDING 2: ON THE BEACH",
+      "store": "Steam",
+      "sizeLabel": "150 GB",
+      "accent": "#812B21",
+      "coverUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3280350/9b523fd411eeaefe80f238489745325a1cd2317f/library_capsule_2x.jpg?t=1774022345",
+      "heroUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3280350/972e2623410ee0701001fb07373fef4ea94f7b31/library_hero_2x.jpg?t=1774022345",
+      "genres": [
+        "Ação",
+        "Aventura"
+      ],
+      "description": "Com companheiros ao seu lado, Sam inicia uma nova jornada para salvar a humanidade da extinção. Junte-se a eles na viagem por um mundo problemático repleto de inimigos sobrenaturais, obstáculos e uma dúvida inquietante: deveríamos ter nos conectado?",
+      "releaseDate": "2026-03-19",
+      "playTimeHours": 0,
+      "isInstalled": false,
+      "isFavorite": false,
+      "addedDaysAgo": 7
+    },
+    {
+      "id": "first-light",
+      "title": "007 First Light",
+      "store": "Steam",
+      "sizeLabel": "80 GB",
+      "accent": "#BD8F37",
+      "coverUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3768760/1159a696d257cbeb3f4479be3466cfba2ae938a0/library_600x900_2x.jpg?t=1791886607",
+      "heroUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3768760/136e92ac58ef98f53885421391c0f1c08c899cdf/library_hero_2x.jpg?t=1791886607",
+      "genres": [
+        "Ação",
+        "Aventura"
+      ],
+      "description": "Conquiste o número. 007 First Light é um emocionante jogo de espionagem, ação e aventura desenvolvido pela IO Interactive. Acompanhe a jornada de James Bond, um jovem recruta habilidoso e, às vezes, imprudente, no programa de treinamento do MI6. Conheça a origem do espião mais famoso do mundo.",
+      "releaseDate": "2026-05-26",
+      "lastPlayedDaysAgo": 60,
+      "playTimeHours": 12,
+      "isInstalled": true,
+      "isFavorite": false,
+      "addedDaysAgo": 10
+    },
+    {
+      "id": "forza5",
+      "title": "Forza Horizon 5",
+      "store": "Xbox",
+      "sizeLabel": "110 GB",
+      "accent": "#3781BD",
+      "coverUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1551360/library_600x900_2x.jpg?t=1788546569",
+      "heroUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1551360/library_hero_2x.jpg?t=1788546569",
+      "genres": [
+        "Ação",
+        "Aventura"
+      ],
+      "description": "Explore as paisagens vibrantes de mundo aberto do México com diversão e velocidade sem limites com os melhores carros do mundo.",
+      "releaseDate": "2021-11-08",
+      "lastPlayedDaysAgo": 21,
+      "playTimeHours": 140,
+      "isInstalled": true,
+      "isFavorite": false,
+      "addedDaysAgo": 30
+    },
+    {
+      "id": "avowed",
+      "title": "Avowed",
+      "store": "Xbox",
+      "sizeLabel": "75 GB",
+      "accent": "#7E2438",
+      "coverUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2457220/daca2b22832ca67d1a675b02cdeca255eb318da2/library_600x900_2x.jpg?t=1771352530",
+      "heroUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2457220/0b9339b64560ce5d4642651c57b70abda9a8d47e/library_hero_2x.jpg?t=1771352530",
+      "genres": [
+        "RPG"
+      ],
+      "description": "Avowed é um RPG de fantasia em primeira pessoa da Obsidian Entertainment.",
+      "releaseDate": "2025-02-18",
+      "playTimeHours": 0,
+      "isInstalled": true,
+      "isFavorite": false,
+      "addedDaysAgo": 6
+    },
+    {
+      "id": "indiana",
+      "title": "Indiana Jones e o Grande Círculo",
+      "store": "Xbox",
+      "sizeLabel": "120 GB",
+      "accent": "#CB8C29",
+      "coverUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2677660/library_600x900_brazilian_2x.jpg?t=1778168392",
+      "heroUrl": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2677660/library_hero_2x.jpg?t=1778168392",
+      "genres": [
+        "Ação",
+        "Aventura"
+      ],
+      "description": "Descubra um dos maiores mistérios da história em uma aventura solo em primeira pessoa. Em 1937, forças sinistras estão vasculhando o mundo atrás do segredo de um poder ancestral ligado ao Grande Círculo. Só uma pessoa pode impedi-las: Indiana Jones™.",
+      "releaseDate": "2024-12-08",
+      "lastPlayedDaysAgo": 60,
+      "playTimeHours": 19,
+      "isInstalled": true,
+      "isFavorite": false,
+      "addedDaysAgo": 20
+    }
+  ]
+}

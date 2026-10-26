@@ -1,0 +1,2301 @@
+use super::*;
+use crate::shell::{Layer, Shell, theme_preview};
+use tako_core::input::GamepadButtons as B;
+use tako_core::input::shortcut::chord;
+use tako_core::library::GameStore;
+use tako_core::paths::DataPaths;
+use tako_platform::Platform;
+
+use crate::LANG_LOCK as LOCK;
+
+fn ctx() -> (tempfile::TempDir, Ctx) {
+    let dir = tempfile::tempdir().unwrap();
+    let ctx = crate::app::build_ctx(DataPaths::at(dir.path()), Platform::simulated(), true);
+    i18n::set_lang(Lang::PtBr);
+    (dir, ctx)
+}
+
+fn rows_of(ctx: &Ctx, id: &str) -> Vec<MenuItem> {
+    let cat = categories().into_iter().find(|c| c.id == id).unwrap();
+    (cat.rows)(ctx)
+}
+
+#[test]
+fn downloads_settings_only_appear_on_desktop() {
+    let _g = LOCK.lock().unwrap();
+    let (_dir, mut ctx) = ctx();
+    let mut page = SettingsPage::at("downloads");
+    ctx.desktop = false;
+    page.render(&ctx, &mut Out::default());
+    assert!(!page.cats.iter().any(|c| c.id == "downloads"));
+    assert!(page.cat < page.cats.len());
+    ctx.desktop = true;
+    page.render(&ctx, &mut Out::default());
+    assert!(page.cats.iter().any(|c| c.id == "downloads"));
+}
+
+fn find(items: &[MenuItem], key: &str) -> MenuItem {
+    items
+        .iter()
+        .find(|i| i.row.key == key)
+        .cloned()
+        .unwrap_or_else(|| panic!("sem a linha {key}"))
+}
+
+fn accept(ctx: &mut Ctx, item: &MenuItem) -> Flow {
+    (item.accept.clone().unwrap())(ctx)
+}
+
+fn adjust(ctx: &mut Ctx, item: &MenuItem, dir: i32) {
+    let _ = (item.adjust.clone().unwrap())(ctx, dir);
+}
+
+#[test]
+fn navigates_between_categories_and_rows() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    let mut page = SettingsPage::new();
+    let n = page.cats.len();
+    assert_eq!(n, 12);
+    page.handle(Cmd::NextSection, &mut ctx);
+    assert_eq!(page.cats[page.cat].id, "appearance");
+    page.handle(Cmd::PrevSection, &mut ctx);
+    page.handle(Cmd::PrevSection, &mut ctx);
+    assert_eq!(page.cats[page.cat].id, "about");
+    page.handle(Cmd::Up, &mut ctx);
+    assert_eq!(page.cats[page.cat].id, "system");
+    // A entra nas linhas, pulando o título "Diagnóstico".
+    page.handle(Cmd::Accept, &mut ctx);
+    assert_eq!(page.row, Some(1));
+    page.handle(Cmd::Down, &mut ctx);
+    assert_eq!(page.row, Some(2));
+    page.handle(Cmd::Back, &mut ctx);
+    assert_eq!(page.row, None);
+    assert!(matches!(page.handle(Cmd::Back, &mut ctx), Nav::Sidebar));
+    assert_eq!(
+        SettingsPage::at("controls").cats[SettingsPage::at("controls").cat].id,
+        "controls"
+    );
+}
+
+#[test]
+fn categories_follow_the_review_order_and_audio_is_under_sound() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, ctx) = ctx();
+    let ids: Vec<_> = categories()
+        .into_iter()
+        .map(|category| category.id)
+        .collect();
+    assert_eq!(
+        ids,
+        [
+            "general",
+            "theme",
+            "appearance",
+            "sound",
+            "screen",
+            "controls",
+            "library",
+            "metadata",
+            "downloads",
+            "integrations",
+            "system",
+            "about",
+        ]
+    );
+    assert!(sound(&ctx).iter().any(|item| item.row.key == "audio"));
+    assert!(
+        !screen::rows(&ctx)
+            .iter()
+            .any(|item| item.row.key == "audio")
+    );
+}
+
+#[test]
+fn text_size_and_navigation_volume_persist_and_are_bounded() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_guard, mut ctx) = crate::metadata::test_ctx(dir.path(), false);
+    let text = find(&rows_of(&ctx, "appearance"), "text-size");
+    let sound = find(&rows_of(&ctx, "sound"), "navigation-volume");
+    assert!(
+        !rows_of(&ctx, "appearance")
+            .iter()
+            .any(|i| i.row.key == "navigation-volume")
+    );
+    adjust(&mut ctx, &text, -1);
+    assert_eq!(crate::navigation_feedback::text_size(&ctx.settings), 125);
+    for _ in 0..20 {
+        adjust(&mut ctx, &sound, 1);
+    }
+    assert_eq!(crate::navigation_feedback::volume(&ctx.settings), 100);
+    for _ in 0..8 {
+        adjust(&mut ctx, &sound, -1);
+    }
+    drop(ctx);
+    let ctx = crate::app::build_ctx(DataPaths::at(dir.path()), Platform::simulated(), false);
+    assert_eq!(crate::navigation_feedback::text_size(&ctx.settings), 125);
+    assert_eq!(crate::navigation_feedback::volume(&ctx.settings), 20);
+}
+
+#[test]
+fn toggles_persist_in_settings() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    let items = rows_of(&ctx, "appearance");
+    let motion = find(&items, "settings.appearance.motion");
+    assert!(!motion.row.on);
+    accept(&mut ctx, &motion);
+    assert!(ctx.settings.bool(keys::REDUCED_MOTION, false));
+    assert!(
+        find(&rows_of(&ctx, "appearance"), "settings.appearance.motion")
+            .row
+            .on
+    );
+    // Cor dinâmica começa ligada.
+    let dynamic = find(&items, "settings.appearance.dynamic");
+    assert!(dynamic.row.on);
+    accept(&mut ctx, &dynamic);
+    assert!(!ctx.settings.bool(keys::DYNAMIC_COLOR, true));
+
+    // Atualizações vão para o updates.json.
+    let auto = find(&rows_of(&ctx, "general"), "settings.general.autoupdate");
+    assert!(auto.row.on);
+    accept(&mut ctx, &auto);
+    assert!(!UpdatePreferences::load(&ctx.paths.updates()).auto_update);
+
+    // Opções de desenvolvedor mostram "Recarregar tema".
+    let has_reload = |ctx: &Ctx| {
+        rows_of(ctx, "system")
+            .iter()
+            .any(|i| i.row.key == "settings.system.reload_theme")
+    };
+    assert!(!has_reload(&ctx));
+    let dev = find(&rows_of(&ctx, "system"), "settings.system.developer");
+    accept(&mut ctx, &dev);
+    assert!(has_reload(&ctx));
+    let reload = find(&rows_of(&ctx, "system"), "settings.system.reload_theme");
+    accept(&mut ctx, &reload);
+    assert_eq!(
+        ctx.effects.last(),
+        Some(&Effect::ApplyTheme("default".into()))
+    );
+}
+
+#[test]
+fn store_toggle_updates_disabled_stores() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    assert_eq!(library::toggle_store("Epic, Gog", GameStore::Gog), "Epic");
+    assert_eq!(
+        library::toggle_store("Epic", GameStore::Steam),
+        "Epic,Steam"
+    );
+    assert_eq!(library::toggle_store("", GameStore::Steam), "Steam");
+
+    let (_d, mut ctx) = ctx();
+    let steam = find(&rows_of(&ctx, "library"), "store:Steam");
+    assert!(steam.row.on);
+    accept(&mut ctx, &steam);
+    assert_eq!(ctx.settings.string(keys::DISABLED_STORES), "Steam");
+    assert_eq!(ctx.effects.last(), Some(&Effect::ReloadLibrary));
+    let steam = find(&rows_of(&ctx, "library"), "store:Steam");
+    assert!(!steam.row.on);
+    assert!(!steam.row.description.is_empty());
+    accept(&mut ctx, &steam);
+    assert_eq!(ctx.settings.string(keys::DISABLED_STORES), "");
+}
+
+#[test]
+fn language_switch_changes_texts() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    let mut page = SettingsPage::new();
+    let heading = |page: &mut SettingsPage, ctx: &Ctx| {
+        let mut out = Out::default();
+        page.render(ctx, &mut out);
+        out.props
+            .into_iter()
+            .find(|(n, _)| *n == "settings-heading")
+            .map(|(_, v)| format!("{v:?}"))
+            .unwrap()
+    };
+    assert!(heading(&mut page, &ctx).contains("Geral"));
+    let lang = find(&rows_of(&ctx, "general"), "language");
+    assert_eq!(lang.row.value, "Português (Brasil)");
+    adjust(&mut ctx, &lang, 1);
+    let after = (
+        heading(&mut page, &ctx),
+        i18n::lang(),
+        ctx.settings.string(keys::LANGUAGE),
+    );
+    i18n::set_lang(Lang::PtBr);
+    assert!(after.0.contains("General"), "{}", after.0);
+    assert_eq!(after.1, Lang::EnUs);
+    assert_eq!(after.2, "en-US");
+}
+
+/// Nenhuma linha mostra a chave crua (texto faltando no catálogo), nos dois idiomas.
+#[test]
+fn every_row_has_text() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    ctx.settings.set_bool(keys::DEVELOPER, true);
+    ctx.settings.set(keys::GAME_SCREEN_ID, "DISPLAY2");
+    ctx.collections.create("Favoritos do sofá", None).unwrap();
+    ctx.pad_name = "Controle".into();
+    for lang in [Lang::PtBr, Lang::EnUs] {
+        i18n::set_lang(lang);
+        let mut overlays = Vec::new();
+        for cat in categories() {
+            for f in ["title", "subtitle"] {
+                let k = format!("settings.{}.{f}", cat.id);
+                assert_ne!(ctx.t(&k), k);
+            }
+            for item in (cat.rows)(&ctx) {
+                overlays.push(crate::model::Overlay {
+                    rows: vec![item.row.clone()],
+                    ..Default::default()
+                });
+                // Painéis e diálogos que as linhas abrem. Backup e restauração abrem o seletor de arquivos
+                // do sistema, que no Windows (com área de trabalho no CI) espera um clique para sempre.
+                if matches!(
+                    item.row.key.as_str(),
+                    "settings.system.backup" | "settings.system.restore"
+                ) {
+                    continue;
+                }
+                if let Some(f) = item.accept.clone()
+                    && let Flow::Push(l) = f(&mut ctx)
+                {
+                    overlays.push(l.render(&ctx));
+                }
+            }
+        }
+        overlays.push(controls::ChordLayer::new(&ctx).render(&ctx));
+        overlays.push(controls::TestLayer.render(&ctx));
+        for o in overlays {
+            for text in [&o.title, &o.text, &o.overline] {
+                assert!(!text.contains("settings."), "{lang:?}: {text}");
+            }
+            for r in o.rows {
+                for text in [&r.title, &r.description, &r.value] {
+                    assert!(!text.starts_with("settings."), "{lang:?}: {text}");
+                }
+            }
+        }
+    }
+    i18n::set_lang(Lang::PtBr);
+}
+
+#[test]
+fn sunshine_sync_starts_off_and_requires_preview_confirmation_to_enable() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    let row = find(&rows_of(&ctx, "integrations"), "sunshine-sync");
+    assert!(!row.row.on);
+    assert!(matches!(accept(&mut ctx, &row), Flow::Push(_)));
+    assert!(!ctx.settings.bool(keys::SUNSHINE_SYNC, false));
+}
+
+#[test]
+fn sunshine_preview_filters_invalid_ids() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    assert!(!ctx.library.games().is_empty());
+    let installed = ctx
+        .library
+        .games()
+        .iter()
+        .filter(|g| g.is_installed)
+        .count();
+    let first_was_installed = ctx.library.games()[0].is_installed;
+    ctx.library.games_mut()[0].id = "invalid id with spaces !@#$".into();
+    ctx.library.games_mut()[0].title = "Jogo Inválido".into();
+
+    let valid_count = ctx
+        .library
+        .games()
+        .iter()
+        .filter(|g| g.is_installed && tako_platform::sunshine::is_valid_game_id(&g.id))
+        .count();
+    assert_eq!(valid_count, installed - usize::from(first_was_installed));
+
+    let layer = sunshine::preview_dialog(&ctx, false);
+    let rendered = layer.render(&ctx);
+    assert!(
+        rendered
+            .text
+            .contains(&format!("{valid_count} jogos serão exportados"))
+    );
+    assert!(!rendered.text.contains("Jogo Inválido"));
+    assert_eq!(rendered.rows[0].key, "sunshine-confirm");
+    assert_eq!(rendered.rows[0].style, "primary");
+    assert_eq!(rendered.rows[1].key, "cancel");
+}
+
+#[test]
+fn provider_keys_go_to_the_vault() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    metadata::update(&mut ctx, |p| {
+        p.igdb.enabled = true;
+        p.igdb.client_id = "abc".into();
+        p.sgdb.api_key = "k".into();
+    });
+    forget("settings.providers");
+    let p = metadata::providers(&ctx);
+    assert!(p.igdb.enabled);
+    assert_eq!(p.igdb.client_id, "abc");
+    assert_eq!(p.sgdb.api_key, "k");
+    assert!(ctx.platform.secrets.get("metadata.igdb").is_some());
+    // Sem chave, "Testar" explica o que falta sem ir à rede.
+    let igdb = find(&rows_of(&ctx, "metadata"), "settings.metadata.igdb");
+    let mut panel = match accept(&mut ctx, &igdb) {
+        Flow::Push(l) => l,
+        _ => panic!("painel"),
+    };
+    let rows = panel.render(&ctx).rows;
+    let test = rows.iter().position(|r| r.key == "test").unwrap();
+    for _ in 0..test {
+        panel.handle(Cmd::Down, &mut ctx);
+    }
+    panel.handle(Cmd::Accept, &mut ctx);
+    let desc = &panel.render(&ctx).rows[test].description;
+    assert_eq!(desc, &ctx.t("metadata.igdb.problem.missing_client_secret"));
+}
+
+#[test]
+fn game_screen_choices_cycle() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    let display = find(&screen::rows(&ctx), "display");
+    adjust(&mut ctx, &display, 1);
+    assert_eq!(ctx.settings.string(keys::GAME_SCREEN_ID), "DISPLAY1");
+    assert_eq!(ctx.settings.string(keys::GAME_SCREEN_NAME), "Monitor");
+    adjust(&mut ctx, &display, 1);
+    assert_eq!(ctx.settings.string(keys::GAME_SCREEN_ID), "DISPLAY2");
+    adjust(&mut ctx, &display, -1);
+    let mode = find(&screen::rows(&ctx), "mode");
+    adjust(&mut ctx, &mode, 1);
+    assert_eq!(ctx.settings.string(keys::GAME_SCREEN_MODE), "1920x1080@144");
+    adjust(&mut ctx, &mode, -1);
+    assert_eq!(ctx.settings.string(keys::GAME_SCREEN_MODE), "");
+    // O monitor de mesa não tem HDR; a TV tem.
+    assert!(
+        !screen::rows(&ctx)
+            .iter()
+            .any(|i| i.row.key == "settings.screen.hdr")
+    );
+    // Nem VRR: a opção aparece desligada, com o motivo.
+    let vrr = find(&screen::rows(&ctx), "vrr.toggle");
+    assert!(!vrr.row.enabled);
+    assert_eq!(vrr.row.description, "Esta tela não informa VRR");
+    let hide = find(&screen::rows(&ctx), "hide");
+    assert!(hide.row.on);
+    accept(&mut ctx, &hide);
+    assert_eq!(ctx.settings.string(keys::GAME_SCREEN_HIDE_OTHERS), "None");
+    let audio = find(&screen::audio_rows(&ctx), "audio");
+    adjust(&mut ctx, &audio, 1);
+    assert_eq!(ctx.settings.string(keys::GAME_AUDIO_NAME), "Alto-falantes");
+}
+
+#[test]
+fn chord_capture_saves_the_held_buttons() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    ctx.input = crate::shell::InputKind::Gamepad;
+    let mut layer = controls::ChordLayer::new(&ctx);
+    layer.render(&ctx); // nada segurado: espera
+    ctx.pressed_buttons = (B::VIEW | B::X).0;
+    layer.render(&ctx);
+    // B no meio da espera não fecha enquanto segura.
+    assert!(matches!(layer.handle(Cmd::Back, &mut ctx), Flow::Stay));
+    std::thread::sleep(std::time::Duration::from_millis(1050));
+    layer.render(&ctx);
+    assert!(
+        matches!(layer.handle(Cmd::Accept, &mut ctx), Flow::Stay),
+        "só salva depois de soltar"
+    );
+    ctx.pressed_buttons = 0;
+    layer.render(&ctx);
+    assert!(ctx.live_pad.get());
+    assert!(matches!(layer.handle(Cmd::Accept, &mut ctx), Flow::Close));
+    assert_eq!(
+        chord::parse(ctx.settings.get(keys::CONTROL_CENTER_CHORD)),
+        B::VIEW | B::X
+    );
+}
+
+#[test]
+fn key_capture_refuses_conflicts_and_saves_the_pressed_shortcut() {
+    use tako_core::input::shortcut::{KeyModifiers as M, KeyShortcut};
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    let mut layer = controls::KeyLayer::default();
+    // Ctrl sozinho só mostra o que está pressionado.
+    assert!(matches!(
+        layer.key("\u{11}", M::CTRL, &mut ctx),
+        Some(Flow::Stay)
+    ));
+    assert_eq!(layer.render(&ctx).rows[1].value, "Ctrl+…");
+    // Shift+Tab (Backtab no Slint) é da Steam: recusa e explica.
+    assert!(matches!(
+        layer.key("\u{19}", M::SHIFT, &mut ctx),
+        Some(Flow::Stay)
+    ));
+    assert!(layer.render(&ctx).rows[1].description.contains("Steam"));
+    assert!(ctx.settings.get(keys::CONTROL_CENTER_KEY).is_none());
+    assert!(matches!(
+        layer.key("t", M::CTRL | M::ALT, &mut ctx),
+        Some(Flow::Close)
+    ));
+    assert_eq!(
+        KeyShortcut::parse(ctx.settings.get(keys::CONTROL_CENTER_KEY)),
+        KeyShortcut::new(M::CTRL | M::ALT, "T")
+    );
+    // Esc sozinho cancela e mantém o atalho.
+    let mut again = controls::KeyLayer::default();
+    assert!(matches!(
+        again.key("\u{1b}", M::NONE, &mut ctx),
+        Some(Flow::Close)
+    ));
+    assert_eq!(ctx.toast.as_ref().unwrap().0, "Atalho mantido · Ctrl+Alt+T");
+}
+
+#[test]
+fn storage_lists_the_largest_games_and_sorts_by_size() {
+    use tako_core::library::{LibraryCriteria, LibraryFilter, LibrarySort, query};
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    ctx.library.refresh();
+    let biggest = ctx
+        .library
+        .games()
+        .iter()
+        .max_by_key(|g| g.size_bytes)
+        .map(|g| g.id.clone())
+        .unwrap();
+
+    let row = find(&rows_of(&ctx, "library"), "storage");
+    assert_ne!(row.row.value, "");
+    let mut panel = library::storage_panel(&ctx);
+    let rows = panel.render(&ctx).rows;
+    let first = rows.iter().position(|r| r.kind == "action").unwrap();
+    assert_eq!(rows[first].key, biggest);
+    assert!(matches!(
+        panel.click("row", first, &mut ctx),
+        Flow::CloseAll
+    ));
+    assert_eq!(ctx.open_details.as_deref(), Some(biggest.as_str()));
+
+    let by_size = LibraryCriteria {
+        sort: LibrarySort::Size,
+        ..Default::default()
+    };
+    let sorted = query::apply(ctx.library.games(), LibraryFilter::All, &by_size);
+    assert_eq!(sorted[0].id, biggest);
+}
+
+#[test]
+fn themes_installed_from_an_address_offer_updates() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, ctx) = ctx();
+    let rows = |ctx: &Ctx| {
+        let layer = themes_panel(ctx);
+        layer.render(ctx).rows
+    };
+    let keys: Vec<String> = rows(&ctx).into_iter().map(|r| r.key).collect();
+    assert!(keys.contains(&"install-url".to_owned()));
+    // Sem tema por endereço, nada a atualizar.
+    assert!(!keys.contains(&"update-themes".to_owned()));
+    assert!(matches!(install_from_url(&ctx), Flow::Push(_)));
+    let root = ctx.paths.themes();
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(
+        root.join(".sources.json"),
+        r#"{"Autor_Tema":{"repo":"https://github.com/autor/tema","tag":"v1"}}"#,
+    )
+    .unwrap();
+    assert!(rows(&ctx).iter().any(|r| r.key == "update-themes"));
+}
+
+#[test]
+fn tako_buttons_can_be_swapped_and_the_hints_follow() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    ctx.input = crate::shell::ctx::InputKind::Gamepad;
+    let rows = rows_of(&ctx, "controls");
+    assert_eq!(find(&rows, "button-accept").row.value, "A");
+    assert!(!find(&rows, "buttons-reset").row.enabled);
+    // Aceitar passa ao B; Voltar fica com o A.
+    accept(&mut ctx, &find(&rows, "button-accept"));
+    let rows = rows_of(&ctx, "controls");
+    assert_eq!(find(&rows, "button-accept").row.value, "B");
+    assert_eq!(find(&rows, "button-back").row.value, "A");
+    assert_eq!(ctx.glyph(Cmd::Accept), "B");
+    assert_eq!(ctx.glyph(Cmd::Back), "A");
+    assert_eq!(ctx.glyph(Cmd::Guide), "⌂");
+    // O aviso diz o que mudou.
+    let toast = ctx.toast.clone().unwrap().0;
+    assert!(
+        toast.contains("Aceitar B") && toast.contains("Voltar A"),
+        "{toast}"
+    );
+    ctx.pad = crate::gamepad::PadFamily::PlayStation;
+    assert_eq!(ctx.glyph(Cmd::Accept), "○");
+    // Restaurar volta ao padrão.
+    let reset = find(&rows_of(&ctx, "controls"), "buttons-reset");
+    assert!(reset.row.enabled);
+    accept(&mut ctx, &reset);
+    assert_eq!(
+        ctx.profile().buttons,
+        tako_core::input::ButtonMap::default()
+    );
+    assert_eq!(ctx.glyph(Cmd::Accept), "✕");
+}
+
+/// TelaControles no desktop: uma linha por controle (bateria só no em uso) e o grupo "Teste".
+#[test]
+fn desktop_lists_every_connected_controller_and_a_test_group() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    ctx.desktop = true;
+    ctx.pads = vec![
+        ("a".into(), "Xbox Wireless".into()),
+        ("b".into(), "DualSense".into()),
+    ];
+    (ctx.pad_guid, ctx.pad_name, ctx.pad_battery) = ("b".into(), "DualSense".into(), Some(15));
+    let rows = rows_of(&ctx, "controls");
+    let pads: Vec<_> = rows.iter().filter(|r| r.row.key == "controller").collect();
+    assert_eq!(pads.len(), 2);
+    assert_eq!(pads[0].row.value, "");
+    let in_use = &pads[1].row;
+    // Bateria: só o número (a barrinha liga com `on`), em `warning` abaixo de 20%.
+    assert_eq!(
+        (in_use.value.as_str(), in_use.style.as_str(), in_use.on),
+        ("15", "warning", true)
+    );
+    assert!(!pads[0].row.on);
+    let pos = |k: &str| rows.iter().position(|r| r.row.key == k).unwrap();
+    assert_eq!(rows[pos("settings.controls.test") - 1].row.kind, "header");
+    assert!(pos("settings.controls.test") < pos("reset"));
+}
+
+#[test]
+fn each_controller_gets_its_own_profile() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    const PAD1: &str = "030000005e0400000b0b000000000000";
+    const PAD2: &str = "050000004c050000e60c000000000000";
+    ctx.input = crate::shell::ctx::InputKind::Gamepad;
+    ctx.pads = vec![
+        (PAD1.into(), "Xbox Wireless".into()),
+        (PAD2.into(), "DualSense".into()),
+    ];
+    ctx.pads_connected = 2;
+    (ctx.pad_guid, ctx.pad_name) = (PAD1.into(), "Xbox Wireless".into());
+    let rows = rows_of(&ctx, "controls");
+    assert_eq!(find(&rows, "pad-0").row.value, "Padrão");
+    assert!(!find(&rows, "profile-rename").row.enabled);
+    assert!(!find(&rows, "profile-delete").row.enabled);
+
+    // Novo perfil: vale para o controle em uso.
+    let Flow::Push(mut layer) = accept(&mut ctx, &find(&rows, "profile-new")) else {
+        panic!("sem teclado");
+    };
+    assert!(
+        matches!(layer.handle(Cmd::Menu, &mut ctx), Flow::Stay),
+        "nome vazio"
+    );
+    layer.text("Arcade", &mut ctx);
+    assert!(matches!(layer.handle(Cmd::Menu, &mut ctx), Flow::Close));
+    assert_eq!(ctx.profile().name, "Arcade");
+    // Os botões e a combinação mudam só no perfil Arcade.
+    let rows = rows_of(&ctx, "controls");
+    accept(&mut ctx, &find(&rows, "button-accept"));
+    assert_eq!(ctx.glyph(Cmd::Accept), "B");
+    let mut chord_layer = controls::ChordLayer::new(&ctx);
+    chord_layer.render(&ctx);
+    ctx.pressed_buttons = (B::GUIDE | B::X).0;
+    chord_layer.render(&ctx);
+    std::thread::sleep(std::time::Duration::from_millis(1050));
+    chord_layer.render(&ctx);
+    ctx.pressed_buttons = 0;
+    chord_layer.render(&ctx);
+    assert!(matches!(
+        chord_layer.handle(Cmd::Accept, &mut ctx),
+        Flow::Close
+    ));
+    assert_eq!(ctx.profile().chord, B::GUIDE | B::X);
+    // O "Aperte A para salvar" segue o botão de aceitar do perfil.
+    let accept_text = ctx.tf(
+        "settings.controls.press_save",
+        &[("accept", ctx.pad_glyph(Cmd::Accept))],
+    );
+    assert_eq!(accept_text, "Aperte B para salvar");
+
+    // O outro controle continua no padrão.
+    let input = ctx.profiles.read([(PAD2, B::B), (PAD1, B::B)]);
+    assert_eq!(input.buttons, B::A | B::B);
+    assert!(ctx.profiles.read([(PAD1, B::GUIDE | B::X)]).central);
+    assert!(!ctx.profiles.read([(PAD2, B::GUIDE | B::X)]).central);
+    (ctx.pad_guid, ctx.pad_name) = (PAD2.into(), "DualSense".into());
+    assert_eq!(ctx.glyph(Cmd::Accept), "A");
+    assert_eq!(ctx.profile().chord, chord::DEFAULT);
+
+    // Escolher o perfil do DualSense pela linha dele.
+    let rows = rows_of(&ctx, "controls");
+    assert_eq!(find(&rows, "pad-1").row.value, "Padrão");
+    accept(&mut ctx, &find(&rows, "pad-1"));
+    assert_eq!(ctx.profile().name, "Arcade");
+    assert!(
+        ctx.toast
+            .clone()
+            .unwrap()
+            .0
+            .contains("DualSense: perfil Arcade")
+    );
+
+    // Renomear e excluir.
+    let rows = rows_of(&ctx, "controls");
+    let Flow::Push(mut layer) = accept(&mut ctx, &find(&rows, "profile-rename")) else {
+        panic!("sem teclado");
+    };
+    layer.erase(&mut ctx);
+    layer.text("o", &mut ctx);
+    assert!(matches!(layer.handle(Cmd::Menu, &mut ctx), Flow::Close));
+    assert_eq!(ctx.profile().name, "Arcado");
+    let rows = rows_of(&ctx, "controls");
+    let Flow::Push(dialog) = accept(&mut ctx, &find(&rows, "profile-delete")) else {
+        panic!("sem confirmação");
+    };
+    let mut dialog = dialog;
+    let delete = dialog.render(&ctx).rows;
+    assert_eq!(delete[0].key, "delete");
+    dialog.handle(Cmd::Accept, &mut ctx);
+    assert!(ctx.profile().is_default());
+    (ctx.pad_guid, ctx.pad_name) = (PAD1.into(), "Xbox Wireless".into());
+    assert!(ctx.profile().is_default());
+    assert_eq!(ctx.profiles.all().len(), 1);
+    // Gravado nas configurações: relido, dá o mesmo.
+    let again =
+        tako_core::input::profiles::Profiles::load(|k| ctx.settings.get(k).map(str::to_owned));
+    assert_eq!(again, ctx.profiles);
+}
+
+#[test]
+fn emulators_panel_keeps_folders_executables_and_the_emulator_of_each_system() {
+    use tako_sources::emulators::emulator::Emulator;
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (dir, mut ctx) = ctx();
+    let cache = emulators::Cache::default();
+    let rows = |ctx: &Ctx| emulators::rows(ctx, &cache);
+    // A loja aparece com a entrada para o painel.
+    let lib = rows_of(&ctx, "library");
+    assert!(matches!(
+        accept(&mut ctx, &find(&lib, "settings.library.emulators")),
+        Flow::Push(_)
+    ));
+    // Pasta nova: uma subpasta por sistema; muda para SNES pelo diálogo e depois remove.
+    let roms = dir.path().join("ROMs");
+    emulators::add_folder_path(&mut ctx, roms.clone());
+    assert!(ctx.effects.iter().any(|e| matches!(e, Effect::Rescan)));
+    let folder = find(&rows(&ctx), "folder-0");
+    assert_eq!(folder.row.value, "Uma subpasta por sistema");
+    let mut dialog = emulators::folder_options(&ctx, 0);
+    let items = dialog.render(&ctx).rows;
+    // O foco começa em "Remover" e pula o título.
+    let snes = items.iter().position(|r| r.key == "snes").unwrap();
+    let downs = items[1..=snes]
+        .iter()
+        .filter(|r| r.kind != "header")
+        .count();
+    for _ in 0..downs {
+        dialog.handle(Cmd::Down, &mut ctx);
+    }
+    dialog.handle(Cmd::Accept, &mut ctx);
+    assert_eq!(find(&rows(&ctx), "folder-0").row.value, "Super Nintendo");
+    // Executável escolhido à mão: vale e libera o emulador dos sistemas dele.
+    let exe = dir.path().join("Dolphin.exe");
+    std::fs::write(&exe, b"").unwrap();
+    emulators::set_exe(&mut ctx, Emulator::Dolphin, exe.clone());
+    let r = rows(&ctx);
+    assert_eq!(find(&r, "emulator-dolphin").row.value, "Encontrado");
+    let gc = find(&r, "system-gc");
+    assert_eq!(gc.row.value, "Automático (Dolphin)");
+    accept(&mut ctx, &gc);
+    assert_eq!(find(&rows(&ctx), "system-gc").row.value, "Dolphin");
+    let saved = crate::sources::emulator_config(&ctx.settings);
+    assert_eq!(saved.by_system.get("gc"), Some(&Emulator::Dolphin));
+    assert_eq!(saved.paths.get(&Emulator::Dolphin), Some(&exe));
+    // Remover a pasta.
+    let mut dialog = emulators::folder_options(&ctx, 0);
+    dialog.handle(Cmd::Accept, &mut ctx);
+    assert!(
+        crate::sources::emulator_config(&ctx.settings)
+            .rom_folders
+            .is_empty()
+    );
+}
+
+#[test]
+fn hiding_the_controller_offers_the_driver_or_the_option() {
+    use std::sync::Arc;
+    use tako_core::devices::controller_hiding::{HIDHIDE_URL, SETTING};
+    use tako_core::devices::fake::FakeHiding;
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    // Fora do Windows (e no simulado): nem aparece.
+    let has = |ctx: &Ctx, key: &str| rows_of(ctx, "controls").iter().any(|r| r.row.key == key);
+    assert!(!has(&ctx, "settings.controls.hidhide"));
+    assert!(!has(&ctx, "settings.controls.hide_pads"));
+    // Sem o driver: oferece a página oficial (não baixa nada).
+    ctx.platform.controller_hiding = Arc::new(FakeHiding::new(false));
+    let offer = find(&rows_of(&ctx, "controls"), "settings.controls.hidhide");
+    accept(&mut ctx, &offer);
+    assert!(
+        ctx.effects
+            .iter()
+            .any(|e| matches!(e, Effect::OpenUrl(u) if u == HIDHIDE_URL))
+    );
+    // Com o driver: a opção, ligada por padrão.
+    ctx.platform.controller_hiding = Arc::new(FakeHiding::new(true));
+    let rows = rows_of(&ctx, "controls");
+    assert!(!has(&ctx, "settings.controls.hidhide"));
+    let option = find(&rows, "settings.controls.hide_pads");
+    assert!(option.row.on);
+    accept(&mut ctx, &option);
+    assert!(!ctx.settings.bool(SETTING, true));
+}
+
+#[test]
+fn each_monitor_gets_back_its_own_resolution_and_hdr() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    let display = find(&screen::rows(&ctx), "display");
+    // TV: a maior resolução e HDR.
+    adjust(&mut ctx, &display, -1);
+    assert_eq!(ctx.settings.string(keys::GAME_SCREEN_ID), "DISPLAY2");
+    let mode = find(&screen::rows(&ctx), "mode");
+    adjust(&mut ctx, &mode, 1);
+    let hdr = find(&screen::rows(&ctx), "settings.screen.hdr");
+    accept(&mut ctx, &hdr);
+    let vrr = find(&screen::rows(&ctx), "vrr.toggle");
+    assert!(vrr.row.enabled);
+    accept(&mut ctx, &vrr);
+    assert_eq!(ctx.settings.string(keys::GAME_SCREEN_MODE), "3840x2160@120");
+    assert!(ctx.settings.bool(keys::GAME_SCREEN_HDR, false));
+    assert!(ctx.settings.bool(keys::GAME_SCREEN_VRR, false));
+    // Monitor sem preset: o padrão (manter a atual, sem HDR); depois, 60 Hz.
+    adjust(&mut ctx, &display, -1);
+    assert_eq!(ctx.settings.string(keys::GAME_SCREEN_ID), "DISPLAY1");
+    assert_eq!(ctx.settings.string(keys::GAME_SCREEN_MODE), "");
+    assert!(!ctx.settings.bool(keys::GAME_SCREEN_HDR, true));
+    assert!(!ctx.settings.bool(keys::GAME_SCREEN_VRR, true));
+    let mode = find(&screen::rows(&ctx), "mode");
+    adjust(&mut ctx, &mode, 1);
+    adjust(&mut ctx, &mode, 1);
+    assert_eq!(ctx.settings.string(keys::GAME_SCREEN_MODE), "1920x1080@60");
+    // De volta à TV: o preset dela volta; e ao monitor, o dele.
+    adjust(&mut ctx, &display, 1);
+    assert_eq!(ctx.settings.string(keys::GAME_SCREEN_MODE), "3840x2160@120");
+    assert!(ctx.settings.bool(keys::GAME_SCREEN_HDR, false));
+    assert!(ctx.settings.bool(keys::GAME_SCREEN_VRR, false));
+    adjust(&mut ctx, &display, 1);
+    assert_eq!(ctx.settings.string(keys::GAME_SCREEN_MODE), "1920x1080@60");
+    assert!(!ctx.settings.bool(keys::GAME_SCREEN_HDR, true));
+    // Valor quebrado volta ao padrão: a tela troca sem preset.
+    ctx.settings.set(keys::GAME_SCREEN_PRESETS, "{quebrado");
+    adjust(&mut ctx, &display, 1);
+    assert_eq!(ctx.settings.string(keys::GAME_SCREEN_ID), "DISPLAY2");
+    assert_eq!(ctx.settings.string(keys::GAME_SCREEN_MODE), "");
+    assert!(!ctx.settings.bool(keys::GAME_SCREEN_HDR, true));
+}
+
+#[test]
+fn desktop_search_finds_rows_in_every_category_and_a_category_click_leaves_it() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, mut ctx) = ctx();
+    ctx.desktop = true;
+    let mut page = SettingsPage::new();
+    page.edited("search", "transparencia", &mut ctx);
+    let rows = page.items(&ctx);
+    // Sem acento e sem maiúsculas: acha "Reduzir transparência" (em Aparência) sob o nome da categoria.
+    assert_eq!(rows[0].row.kind, "header");
+    assert!(
+        rows.iter()
+            .any(|i| i.row.key == "settings.appearance.transparency")
+    );
+    let appearance = page.cats.iter().position(|c| c.id == "appearance").unwrap();
+    assert!(page.matches_in(&ctx, appearance) > 0);
+    page.click("category", 0, &mut ctx);
+    assert!(page.query.is_empty());
+}
+
+/// No desktop toda escolha é um select (CampoDeSelecao): cada linha "choice" tem a lista, e escolher qualquer opção
+/// a deixa como a atual (inclusive as que andam o ciclo até ela).
+#[test]
+fn desktop_choices_are_selects_that_pick_each_option() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    ctx.desktop = true;
+    for cat in categories() {
+        let keys: Vec<String> = (cat.rows)(&ctx)
+            .into_iter()
+            .filter(|i| i.row.kind == "choice" && i.row.enabled)
+            .map(|i| i.row.key)
+            .collect();
+        for key in keys {
+            let item = find(&(cat.rows)(&ctx), &key);
+            let options = item
+                .options
+                .clone()
+                .unwrap_or_else(|| panic!("{}: {key} sem select", cat.id));
+            let n = options(&ctx).0.len();
+            for k in 0..n {
+                let item = find(&(cat.rows)(&ctx), &key);
+                if !options(&ctx).0[k].enabled {
+                    continue;
+                }
+                let mut layer = item.select(&ctx).expect("select");
+                // A lista abre com o título da linha no alto.
+                assert_eq!(layer.render(&ctx).title, item.row.title);
+                let _ = layer.click("row", k, &mut ctx);
+                let item = find(&(cat.rows)(&ctx), &key);
+                let now = (item.options.unwrap())(&ctx).1;
+                assert_eq!(now, k, "{}: {key} opção {k}", cat.id);
+            }
+        }
+    }
+    i18n::set_lang(Lang::PtBr);
+}
+
+#[test]
+fn desktop_volume_is_a_slider_that_drags_mutes_and_jumps() {
+    use crate::navigation_feedback::{SOUND_VOLUME, volume};
+    use crate::shell::keys::RIGHT;
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    ctx.desktop = true;
+    let row = |ctx: &Ctx| {
+        categories()
+            .iter()
+            .flat_map(|c| (c.rows)(ctx))
+            .find(|i| i.row.key == "navigation-volume")
+            .expect("linha do volume")
+    };
+    assert_eq!(row(&ctx).row.kind, "slider");
+    let _ = row(&ctx).slide_zone("row-slide:37", &mut ctx);
+    assert_eq!(volume(&ctx.settings), 37);
+    let _ = row(&ctx).slide_zone("row-drop:0", &mut ctx);
+    assert_eq!(row(&ctx).row.value, ctx.t("accessibility.sound_muted"));
+    let _ = row(&ctx).slide_key("\u{F72B}", false, &mut ctx);
+    assert_eq!(volume(&ctx.settings), 100);
+    ctx.settings.set(SOUND_VOLUME, "50");
+    let _ = row(&ctx).slide_key(&RIGHT.to_string(), true, &mut ctx);
+    assert_eq!(volume(&ctx.settings), 60);
+    // Sem Shift, ← → são do ajuste comum (5 no desktop).
+    assert!(
+        row(&ctx)
+            .slide_key(&RIGHT.to_string(), false, &mut ctx)
+            .is_none()
+    );
+    let _ = (row(&ctx).adjust.unwrap())(&mut ctx, 1);
+    assert_eq!(volume(&ctx.settings), 65);
+}
+
+#[test]
+fn liquid_glass_slider_uses_five_point_arrows_and_ten_with_shift() {
+    use crate::shell::keys::RIGHT;
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    ctx.desktop = true;
+    ctx.settings.set("DesktopTheme", "glass");
+    let adjust = find(&super::desk_theme::rows(&ctx), "glass-opacity")
+        .adjust
+        .unwrap();
+    let _ = adjust(&mut ctx, 1);
+    assert_eq!(
+        find(&super::desk_theme::rows(&ctx), "glass-opacity")
+            .row
+            .value,
+        "33"
+    );
+    let _ = find(&super::desk_theme::rows(&ctx), "glass-opacity").slide_key(
+        &RIGHT.to_string(),
+        true,
+        &mut ctx,
+    );
+    assert_eq!(
+        find(&super::desk_theme::rows(&ctx), "glass-opacity")
+            .row
+            .value,
+        "43"
+    );
+}
+
+#[test]
+fn system_category_includes_backup_and_restore_options() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, ctx) = ctx();
+    let rows = rows_of(&ctx, "system");
+    let backup_row = find(&rows, "settings.system.backup");
+    let restore_row = find(&rows, "settings.system.restore");
+
+    assert_eq!(backup_row.row.title, ctx.t("settings.system.backup"));
+    assert_eq!(backup_row.row.value, ctx.t("settings.system.backup_value"));
+    assert_eq!(restore_row.row.title, ctx.t("settings.system.restore"));
+    assert_eq!(
+        restore_row.row.value,
+        ctx.t("settings.system.restore_value")
+    );
+
+    let backup_path = ctx.paths.root.join("teste.takobackup");
+    let dialog = super::confirm_restore_layer(&ctx, backup_path);
+    assert_eq!(dialog.focus, 1, "o foco deve iniciar no botão Cancelar");
+    assert!(!dialog.text.is_empty(), "diálogo deve usar .text(desc)");
+    let items = dialog.render(&ctx);
+    assert_eq!(
+        items.rows[0].title,
+        ctx.t("settings.system.restore_confirm_button")
+    );
+    assert_eq!(items.rows[1].title, ctx.t("common.cancel"));
+}
+
+#[test]
+fn restore_is_blocked_when_game_running_or_scanning() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // 1. Bloqueado com jogo rodando
+    ctx.running = Some(crate::shell::RunningGame {
+        id: "steam:123".into(),
+        title: "Test Game".into(),
+        pid: None,
+        started: None,
+    });
+    let backup_path = ctx.paths.root.join("teste.takobackup");
+    let dialog = super::confirm_restore_layer(&ctx, backup_path.clone());
+    // Executa no botão Confirmar (linha 0, agora que a descrição fica em .text(desc))
+    let rows = (dialog.build)(&ctx);
+    let action = rows[0].accept.clone().unwrap();
+    let flow = action(&mut ctx);
+    assert!(matches!(flow, Flow::Close));
+    assert_eq!(
+        ctx.toast.as_ref().map(|(t, _)| t.as_str()),
+        Some(
+            ctx.t("settings.system.restore_blocked_game_running")
+                .as_str()
+        )
+    );
+
+    // 2. Bloqueado com varredura em andamento
+    ctx.running = None;
+    ctx.scanning = true;
+    let action2 = rows[0].accept.clone().unwrap();
+    let flow2 = action2(&mut ctx);
+    assert!(matches!(flow2, Flow::Close));
+    assert_eq!(
+        ctx.toast.as_ref().map(|(t, _)| t.as_str()),
+        Some(ctx.t("settings.system.restore_blocked_scanning").as_str())
+    );
+}
+
+#[test]
+fn restoring_blocks_play_rescan_restore_and_settings() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    *ctx.found.lock().unwrap() = vec![tako_core::library::Game {
+        id: "test:game1".into(),
+        title: "Test Game".into(),
+        is_installed: true,
+        ..Default::default()
+    }];
+    ctx.library.refresh();
+
+    ctx.restoring = true;
+    ctx.settings.locked = true;
+
+    // 1. Bloqueia jogar
+    let nav = crate::shell::details::primary_action(&mut ctx, "test:game1");
+    assert!(matches!(nav, crate::shell::Nav::Stay));
+    assert_eq!(
+        ctx.toast.as_ref().map(|(t, _)| t.as_str()),
+        Some(ctx.t("settings.system.restore_busy").as_str())
+    );
+    assert!(
+        ctx.effects.is_empty(),
+        "nenhum efeito de jogo deve ser disparado"
+    );
+
+    // 2. Bloqueia varrer
+    ctx.toast = None;
+    ctx.effect(Effect::Rescan);
+    assert!(
+        ctx.effects.is_empty(),
+        "efeito de rescan deve ser bloqueado"
+    );
+    assert_eq!(
+        ctx.toast.as_ref().map(|(t, _)| t.as_str()),
+        Some(ctx.t("settings.system.restore_busy").as_str())
+    );
+
+    // 3. Bloqueia restaurar
+    ctx.toast = None;
+    let backup_path = ctx.paths.root.join("teste.takobackup");
+    let dialog = super::confirm_restore_layer(&ctx, backup_path);
+    let rows = (dialog.build)(&ctx);
+    let confirm_action = rows[0].accept.clone().unwrap();
+    let flow = confirm_action(&mut ctx);
+    assert!(matches!(flow, Flow::Close));
+    assert_eq!(
+        ctx.toast.as_ref().map(|(t, _)| t.as_str()),
+        Some(ctx.t("settings.system.restore_busy").as_str())
+    );
+
+    // 4. Bloqueia salvar configurações
+    ctx.toast = None;
+    let toggle_item = super::toggle(&ctx, "settings.system.developer", keys::DEVELOPER, false);
+    let toggle_action = toggle_item.accept.clone().unwrap();
+    let toggle_flow = toggle_action(&mut ctx);
+    assert!(matches!(toggle_flow, Flow::Stay));
+    assert_eq!(
+        ctx.toast.as_ref().map(|(t, _)| t.as_str()),
+        Some(ctx.t("settings.system.restore_busy").as_str())
+    );
+    assert!(
+        !ctx.settings.bool(keys::DEVELOPER, false),
+        "configuração não deve ter sido alterada"
+    );
+
+    // Confere também que a linha Restaurar no desktop tem estilo danger
+    ctx.desktop = true;
+    let system_rows = rows_of(&ctx, "system");
+    let restore_row = find(&system_rows, "settings.system.restore");
+    assert_eq!(
+        restore_row.row.style, "danger",
+        "linha Restaurar deve ter estilo danger no desktop"
+    );
+
+    // Confere que o diálogo usa .text(desc) e foco inicial em Cancelar (1)
+    let dialog = super::confirm_restore_layer(&ctx, ctx.paths.root.join("meu.takobackup"));
+    assert_eq!(dialog.focus, 1, "foco inicial deve ser Cancelar");
+    assert!(
+        !dialog.text.is_empty(),
+        "corpo do diálogo deve conter .text(desc)"
+    );
+}
+
+#[test]
+fn sound_settings_persist_and_adjust_volumes_and_toggle_music() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    let items = rows_of(&ctx, "sound");
+
+    let toggle_music = find(&items, "settings.sound.music_enabled");
+    let music_vol = find(&items, "theme-music-volume");
+    let nav_vol = find(&items, "navigation-volume");
+
+    assert!(toggle_music.row.on);
+    assert_eq!(crate::navigation_feedback::music_volume(&ctx.settings), 70);
+    assert_eq!(crate::navigation_feedback::volume(&ctx.settings), 0);
+
+    // Toggle music off
+    accept(&mut ctx, &toggle_music);
+    assert!(!crate::navigation_feedback::music_enabled(&ctx.settings));
+    let items_off = rows_of(&ctx, "sound");
+    let music_vol_off = find(&items_off, "theme-music-volume");
+    assert!(!music_vol_off.row.enabled);
+    assert_ne!(music_vol_off.row.value, "45");
+    assert_ne!(music_vol_off.row.value, "45%");
+
+    // Toggle music back on
+    accept(&mut ctx, &toggle_music);
+    assert!(crate::navigation_feedback::music_enabled(&ctx.settings));
+
+    // Adjust music volume up
+    for _ in 0..5 {
+        adjust(&mut ctx, &music_vol, 1);
+    }
+    assert_eq!(crate::navigation_feedback::music_volume(&ctx.settings), 100);
+
+    // Adjust music volume down to 0
+    for _ in 0..12 {
+        adjust(&mut ctx, &music_vol, -1);
+    }
+    assert_eq!(crate::navigation_feedback::music_volume(&ctx.settings), 0);
+
+    // Adjust navigation sound volume
+    for _ in 0..3 {
+        adjust(&mut ctx, &nav_vol, 1);
+    }
+    assert_eq!(crate::navigation_feedback::volume(&ctx.settings), 30);
+}
+
+#[test]
+fn edit_theme_panel_modifies_saves_and_resets_overrides() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, mut ctx) = ctx();
+
+    // 1. Opção para editar tema existe em Aparência
+    let items = rows_of(&ctx, "appearance");
+    let edit_opt = find(&items, "edit-theme");
+    assert_eq!(edit_opt.row.title, ctx.t("settings.appearance.edit_theme"));
+
+    // 2. Abre o painel de edição de tema
+    let panel = edit_theme_panel(&mut ctx);
+    let rows = panel.items(&ctx);
+    let accent_row = find(&rows, "accent");
+    let font_row = find(&rows, "font");
+    let bg_type_row = find(&rows, "bg_type");
+
+    assert_eq!(
+        accent_row.row.title,
+        ctx.t("settings.appearance.accent_color")
+    );
+    assert_eq!(font_row.row.title, ctx.t("settings.appearance.font"));
+    assert_eq!(bg_type_row.row.title, ctx.t("settings.appearance.bg_type"));
+
+    // 3. Modifica a cor de destaque (testando com controle/teclado via adjust)
+    adjust(&mut ctx, &accent_row, 1);
+    assert!(ctx.theme_draft.is_some());
+
+    // 4. Modifica a cor e fonte no modo desktop (mouse/select)
+    ctx.desktop = true;
+    let panel = edit_theme_panel(&mut ctx);
+    let rows = panel.items(&ctx);
+    let accent_row = find(&rows, "accent");
+    let font_row = find(&rows, "font");
+    let save_row = find(&rows, "save");
+
+    let mut accent_select = accent_row.select(&ctx).expect("select");
+    let _ = accent_select.click("row", 2, &mut ctx); // Vermelho (#E3161E)
+    assert_eq!(
+        ctx.theme_draft.as_ref().unwrap().accent.as_deref(),
+        Some("#E3161E")
+    );
+
+    let mut font_select = font_row.select(&ctx).expect("select");
+    let _ = font_select.click("row", 2, &mut ctx); // Poppins
+    assert_eq!(
+        ctx.theme_draft.as_ref().unwrap().font.as_deref(),
+        Some("Poppins")
+    );
+
+    // 5. Salva a sobreposição
+    accept(&mut ctx, &save_row);
+    assert!(ctx.theme_draft.is_none());
+    assert!(tako_themes::overrides::has_override(
+        &ctx.paths.themes(),
+        None
+    ));
+    let loaded = tako_themes::overrides::load_override(&ctx.paths.themes(), None).unwrap();
+    assert!(loaded.contains("#E3161E"));
+    assert!(loaded.contains("Poppins"));
+
+    // 6. Ao reabrir, a opção de restaurar padrão está visível e funcional
+    let panel = edit_theme_panel(&mut ctx);
+    let rows = panel.items(&ctx);
+    let reset_row = find(&rows, "reset");
+    assert_eq!(
+        reset_row.row.title,
+        ctx.t("settings.appearance.reset_theme")
+    );
+    assert_eq!(reset_row.row.style, "danger");
+    let flow = accept(&mut ctx, &reset_row);
+    let Flow::Push(mut dialog) = flow else {
+        panic!("esperava confirmação em diálogo")
+    };
+    dialog.click("row", 0, &mut ctx);
+
+    // 7. A sobreposição foi removida
+    assert!(!tako_themes::overrides::has_override(
+        &ctx.paths.themes(),
+        None
+    ));
+    assert_eq!(
+        tako_themes::overrides::load_override(&ctx.paths.themes(), None),
+        None
+    );
+}
+
+#[test]
+fn edit_theme_image_full_path_and_promotion() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (dir, mut ctx) = ctx();
+
+    // 1. Abre painel
+    let panel = edit_theme_panel(&mut ctx);
+    let rows = panel.items(&ctx);
+    let bg_type_row = find(&rows, "bg_type");
+
+    // 2. Escolhe Imagem (avança de Padrão -> Sólido -> Imagem via adjust)
+    adjust(&mut ctx, &bg_type_row, 1);
+    let panel = edit_theme_panel(&mut ctx);
+    let rows = panel.items(&ctx);
+    let bg_type_row = find(&rows, "bg_type");
+    adjust(&mut ctx, &bg_type_row, 1);
+
+    // Confirma que bg_type_idx agora é Imagem e a linha choose_image aparece!
+    let panel = edit_theme_panel(&mut ctx);
+    let rows = panel.items(&ctx);
+    assert_eq!(
+        find(&rows, "bg_type").row.value,
+        ctx.t("settings.appearance.bg_image")
+    );
+    let choose_img_row = find(&rows, "choose_image");
+    assert_eq!(
+        choose_img_row.row.value,
+        ctx.t("settings.appearance.bg_no_image")
+    );
+
+    // 3. Simula seleção de arquivo: copia imagem para rascunho
+    let img_src = dir.path().join("wall.png");
+    let img = image::RgbaImage::new(64, 64);
+    img.save(&img_src).unwrap();
+
+    let draft_name =
+        tako_themes::overrides::copy_draft_background_image(&ctx.paths.themes(), None, &img_src)
+            .unwrap();
+    assert_eq!(draft_name, "background.draft.png");
+
+    let mut d = current_draft(&ctx);
+    d.background_image = Some(draft_name);
+    d.background_source_name = Some("wall.png".into());
+    d.background_mode = Some(tako_themes::overrides::BackgroundMode::Image);
+    ctx.theme_draft = Some(d);
+
+    // O painel mostra o nome do arquivo de origem (wall.png) e não background.draft.png
+    let panel = edit_theme_panel(&mut ctx);
+    let rows = panel.items(&ctx);
+    let choose_img_row = find(&rows, "choose_image");
+    assert_eq!(choose_img_row.row.value, "wall.png");
+
+    // 4. Salva a personalização
+    let save_row = find(&rows, "save");
+    accept(&mut ctx, &save_row);
+
+    // Rascunho foi limpo do contexto
+    assert!(ctx.theme_draft.is_none());
+
+    // Imagem foi promovida para background.png definitivo e rascunho removido
+    let ov_dir = tako_themes::overrides::override_dir(&ctx.paths.themes(), None);
+    assert!(ov_dir.join("background.png").is_file());
+    assert!(!ov_dir.join("background.draft.png").exists());
+
+    let loaded = tako_themes::overrides::load_override(&ctx.paths.themes(), None).unwrap();
+    assert!(loaded.contains("custom-background = \"background.png\""));
+}
+
+#[test]
+fn edit_theme_draft_does_not_leak_on_back_and_theme_switch() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // 1. Modifica o rascunho
+    let mut d = current_draft(&ctx);
+    d.accent = Some("#E3161E".into());
+    ctx.theme_draft = Some(d);
+    assert!(ctx.theme_draft.is_some());
+
+    // 2. Sair do painel pelo Back (B) limpa o rascunho
+    let mut panel = edit_theme_panel(&mut ctx);
+    let flow = panel.handle(Cmd::Back, &mut ctx);
+    assert!(matches!(flow, Flow::Close));
+    assert!(
+        ctx.theme_draft.is_none(),
+        "theme_draft vazou ao sair pelo back"
+    );
+
+    // 3. Ao trocar de tema, o rascunho também é zerado
+    let mut d = current_draft(&ctx);
+    d.accent = Some("#6C5CE7".into());
+    ctx.theme_draft = Some(d);
+    assert!(ctx.theme_draft.is_some());
+
+    pick_theme(&mut ctx, None, "Tako");
+    assert!(
+        ctx.theme_draft.is_none(),
+        "theme_draft vazou ao trocar de tema"
+    );
+}
+
+#[test]
+fn edit_theme_hidden_when_ui_not_supported() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // Quando suporta Ui: edit-theme aparece
+    ctx.theme_supports_ui = true;
+    let items = rows_of(&ctx, "appearance");
+    assert!(items.iter().any(|i| i.row.key == "edit-theme"));
+
+    // Quando NÃO suporta Ui: edit-theme fica oculto
+    ctx.theme_supports_ui = false;
+    let items = rows_of(&ctx, "appearance");
+    assert!(!items.iter().any(|i| i.row.key == "edit-theme"));
+}
+
+#[test]
+fn edit_theme_hides_font_and_background_for_themes_that_do_not_use_them() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    ctx.theme_supports_font = false;
+    ctx.theme_supports_background = false;
+
+    let panel = edit_theme_panel(&mut ctx);
+    let rows = panel.items(&ctx);
+    assert!(rows.iter().any(|item| item.row.key == "accent"));
+    assert!(rows.iter().any(|item| item.row.key == "save"));
+    assert!(!rows.iter().any(|item| item.row.key == "font"));
+    assert!(!rows.iter().any(|item| item.row.key == "bg_type"));
+    assert!(!rows.iter().any(|item| item.row.key == "bg_color"));
+    assert!(!rows.iter().any(|item| item.row.key == "choose_image"));
+}
+
+#[test]
+fn desktop_ignores_custom_theme_accent() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // Sem personalização, custom_theme_accent retorna None
+    assert_eq!(crate::theme::custom_theme_accent(&ctx), None);
+
+    // Com personalização no draft
+    let mut d = current_draft(&ctx);
+    d.accent = Some("#E3161E".into()); // Vermelho
+    ctx.theme_draft = Some(d);
+
+    let custom = crate::theme::custom_theme_accent(&ctx).expect("custom accent");
+    assert_eq!(custom, tako_core::presentation::Rgb::new(0xE3, 0x16, 0x1E));
+
+    // No desktop, verifica se o DeskGame com personalização usa o custom accent
+    ctx.desktop = true;
+    let g = tako_core::library::Game {
+        id: "game-1".into(),
+        title: "Meu Jogo".into(),
+        accent: "#00FF00".into(), // Jogo tem cor verde
+        ..Default::default()
+    };
+
+    // O desktop segue a cor do jogo; o override de tema vale na tela cheia.
+    let desk_game_accent = crate::shell::desktop::game_card_accent(&ctx, &g.accent);
+    assert_eq!(
+        desk_game_accent,
+        slint::Color::from_rgb_u8(0x00, 0xFF, 0x00)
+    );
+}
+
+#[test]
+fn desktop_nav_cleans_theme_draft_and_draft_image() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, ctx) = ctx();
+    let mut shell = crate::shell::Shell::new(ctx);
+    shell.enter_desktop();
+
+    let ov_dir = tako_themes::overrides::override_dir(&shell.ctx.paths.themes(), None);
+    std::fs::create_dir_all(&ov_dir).unwrap();
+    let draft_img = ov_dir.join("background.draft.png");
+    std::fs::write(&draft_img, b"temp draft").unwrap();
+
+    let mut d = current_draft(&shell.ctx);
+    d.accent = Some("#FF0055".into());
+    d.background_image = Some("background.draft.png".into());
+    shell.ctx.theme_draft = Some(d);
+
+    // No painel, o destaque do rascunho estaria ativo
+    assert_eq!(
+        crate::theme::custom_theme_accent(&shell.ctx),
+        Some(tako_core::presentation::Rgb::new(0xFF, 0x00, 0x55))
+    );
+
+    // Navega pela barra superior do desktop (índice 0: Biblioteca)
+    shell.desktop_nav(0);
+
+    // Rascunho foi limpo
+    assert!(shell.ctx.theme_draft.is_none());
+    // Arquivo temporário no disco foi apagado
+    assert!(!draft_img.exists());
+    // Destaque voltou ao padrão
+    assert_eq!(crate::theme::custom_theme_accent(&shell.ctx), None);
+}
+
+#[test]
+fn reset_theme_opens_danger_dialog_focused_on_cancel_and_confirms() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // Cria override existente
+    tako_themes::overrides::save_override(&ctx.paths.themes(), None, "accent = \"#123456\"\n")
+        .unwrap();
+    ctx.reload_theme_cache();
+    assert!(tako_themes::overrides::has_override(
+        &ctx.paths.themes(),
+        None
+    ));
+
+    let mut panel = edit_theme_panel(&mut ctx);
+    let ov = panel.render(&ctx);
+    let reset_idx = ov
+        .rows
+        .iter()
+        .position(|r| r.key == "reset")
+        .expect("reset row");
+    assert_eq!(ov.rows[reset_idx].style, "danger");
+
+    // Ao clicar na linha de restaurar, abre o diálogo de confirmação
+    let flow = panel.click("row", reset_idx, &mut ctx);
+    let Flow::Push(mut dialog) = flow else {
+        panic!("esperava Flow::Push do diálogo");
+    };
+
+    // Diálogo com foco em Cancelar (índice 1)
+    let dialog_ov = dialog.render(&ctx);
+    assert_eq!(dialog_ov.rows.len(), 2);
+    assert_eq!(dialog_ov.rows[0].key, "reset");
+    assert_eq!(dialog_ov.rows[0].style, "danger");
+    assert_eq!(dialog_ov.rows[1].key, "cancel");
+
+    // Foco inicial do diálogo é no botão Cancelar (índice 1)
+    assert_eq!(dialog_ov.sel, 1);
+
+    // Cancelar apenas fecha o diálogo sem resetar
+    let cancel_dialog = panel.click("row", reset_idx, &mut ctx);
+    let Flow::Push(mut cancel_dialog_layer) = cancel_dialog else {
+        panic!()
+    };
+    let cancel_flow = cancel_dialog_layer.click("row", 1, &mut ctx);
+    assert!(matches!(cancel_flow, Flow::Close));
+    assert!(tako_themes::overrides::has_override(
+        &ctx.paths.themes(),
+        None
+    ));
+
+    // Confirmar no botão Restaurar remove a sobreposição e fecha tudo
+    let reset_flow = dialog.click("row", 0, &mut ctx);
+    assert!(matches!(reset_flow, Flow::CloseAll));
+    assert!(!tako_themes::overrides::has_override(
+        &ctx.paths.themes(),
+        None
+    ));
+    assert_eq!(ctx.persisted_theme_accent, None);
+}
+
+#[test]
+fn load_safe_image_scales_down_to_3840() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let dir = tempfile::tempdir().unwrap();
+    let img_path = dir.path().join("large.png");
+
+    let img = image::RgbImage::new(4000, 2000);
+    img.save(&img_path).unwrap();
+
+    let loaded = crate::theme::load_safe_image(&img_path).expect("load_safe_image");
+    assert!(loaded.size().width <= 3840);
+    assert!(loaded.size().height <= 3840);
+}
+
+#[test]
+fn api_settings_panel_toggles_and_regenerates_token() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    assert!(!ctx.settings.bool(keys::API_ENABLED, false));
+
+    let rows = rows_of(&ctx, "integrations");
+    let api_row = find(&rows, "settings.system.api");
+    assert_eq!(api_row.row.value, ctx.t("settings.system.api_off"));
+
+    let mut panel = match accept(&mut ctx, &api_row) {
+        Flow::Push(l) => l,
+        _ => panic!("painel api"),
+    };
+
+    let panel_rows = panel.render(&ctx).rows;
+    let enabled_pos = panel_rows
+        .iter()
+        .position(|r| r.key == "api-enabled")
+        .unwrap();
+    for _ in 0..enabled_pos {
+        panel.handle(Cmd::Down, &mut ctx);
+    }
+    panel.handle(Cmd::Accept, &mut ctx);
+    assert!(ctx.settings.bool(keys::API_ENABLED, false));
+    let token1 = ctx.settings.string(keys::API_TOKEN);
+    assert!(!token1.is_empty());
+
+    let regen_pos = panel_rows
+        .iter()
+        .position(|r| r.key == "api-regenerate")
+        .unwrap();
+    let current_pos = enabled_pos;
+    if regen_pos > current_pos {
+        for _ in current_pos..regen_pos {
+            panel.handle(Cmd::Down, &mut ctx);
+        }
+    }
+    let regen_flow = panel.handle(Cmd::Accept, &mut ctx);
+    let mut confirm_dialog = match regen_flow {
+        Flow::Push(l) => l,
+        _ => panic!("esperava diálogo de confirmação"),
+    };
+    confirm_dialog.click("row", 0, &mut ctx);
+    let token2 = ctx.settings.string(keys::API_TOKEN);
+    assert!(!token2.is_empty());
+    assert_ne!(token1, token2);
+    assert!(ctx.toast.is_some());
+}
+
+#[test]
+fn api_token_preview_handles_multibyte_and_invalid_tokens_regenerate() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // 1. Linha do token segue padrão Botão ("Mostrar") e abre diálogo com botão Copiar
+    let valid_token = tako_core::api::generate_token();
+    ctx.settings.set(keys::API_TOKEN, &valid_token);
+    let rows = rows_of(&ctx, "integrations");
+    let api_row = find(&rows, "settings.system.api");
+    let mut panel = match accept(&mut ctx, &api_row) {
+        Flow::Push(l) => l,
+        _ => panic!("painel api"),
+    };
+    let panel_rows = panel.render(&ctx).rows;
+    let token_row = panel_rows.iter().find(|r| r.key == "api-token").unwrap();
+    assert_eq!(token_row.value, ctx.t("settings.system.api_token_show"));
+    let token_pos = panel_rows
+        .iter()
+        .position(|r| r.key == "api-token")
+        .unwrap();
+    for _ in 0..token_pos {
+        panel.handle(Cmd::Down, &mut ctx);
+    }
+    let token_dialog = match panel.handle(Cmd::Accept, &mut ctx) {
+        Flow::Push(l) => l,
+        _ => panic!("esperava diálogo do token"),
+    };
+    let dialog_rendered = token_dialog.render(&ctx);
+    assert!(dialog_rendered.text.contains(&valid_token));
+    assert!(dialog_rendered.rows.iter().any(|r| r.key == "copy"));
+
+    // 2. Token inválido (não-hex) ao ser ativado é regenerado com formato válido (32 hex)
+    ctx.settings.set(keys::API_TOKEN, "invalido");
+    ctx.settings.set_bool(keys::API_ENABLED, false);
+    for _ in 0..token_pos {
+        panel.handle(Cmd::Up, &mut ctx);
+    }
+    panel.handle(Cmd::Accept, &mut ctx);
+    let token = ctx.settings.string(keys::API_TOKEN);
+    assert!(tako_core::api::is_valid_token(&token));
+}
+
+#[test]
+fn create_theme_selection_creation_and_apply_flow() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, mut ctx) = ctx();
+
+    // 1. Ação "Criar tema…" existe em Configurações › Aparência
+    let items = rows_of(&ctx, "appearance");
+    let create_opt = find(&items, "create-theme");
+    assert_eq!(
+        create_opt.row.title,
+        ctx.t("settings.appearance.create_theme")
+    );
+
+    // 2. Sem temas extras como base, pula a escolha e abre direto o editor de criação
+    let Flow::Replace(mut editor) = accept(&mut ctx, &create_opt) else {
+        panic!("esperava editor de criação direto (pula passo com 1 opção)");
+    };
+    let editor_rows = editor.render(&ctx).rows;
+    let save_new_idx = editor_rows
+        .iter()
+        .position(|r| r.key == "save_new")
+        .unwrap();
+    assert_eq!(
+        editor_rows[save_new_idx].title,
+        ctx.t("settings.appearance.save_as_new_theme")
+    );
+
+    // 4. Modifica o rascunho
+    let mut d = current_draft(&ctx);
+    d.accent = Some("#6C5CE7".into());
+    ctx.theme_draft = Some(d);
+
+    // 5. Clica em "Salvar como novo tema": abre o prompt de nome (KeyboardLayer)
+    let Flow::Push(_) = editor.click("row", save_new_idx, &mut ctx) else {
+        panic!("esperava teclado virtual para nome do tema");
+    };
+
+    // 6. Validação de nome
+    assert!(tako_themes::create::validate_theme_name("").is_err());
+    assert!(tako_themes::create::validate_theme_name(&"x".repeat(55)).is_err());
+    assert!(tako_themes::create::validate_theme_name("Nome/Invalido").is_err());
+    assert!(tako_themes::create::validate_theme_name("Novo Tema Incrivel").is_ok());
+
+    // 7. Salva o tema através do finish_create_theme
+    let flow = finish_create_theme(&mut ctx, "Novo Tema Incrivel", None, None, false);
+    let Flow::Replace(mut apply_dialog) = flow else {
+        panic!("esperava diálogo para aplicar tema");
+    };
+
+    let theme_id = "novo-tema-incrivel";
+    let theme_dir = ctx.paths.themes().join(theme_id);
+    assert!(theme_dir.join("theme.toml").is_file());
+    assert!(theme_dir.join("main.slint").is_file());
+    assert!(theme_dir.join("tokens.toml").is_file());
+
+    // 7.1 Confere que o tema criado passa no tako theme check existente
+    let check_res = crate::theme::check(&theme_dir);
+    assert!(
+        check_res.is_ok(),
+        "theme check falhou: {:?}",
+        check_res.err()
+    );
+
+    // 8. Confirma a aplicação do tema recém-criado
+    let dialog_rows = apply_dialog.render(&ctx).rows;
+    let apply_idx = dialog_rows.iter().position(|r| r.key == "apply").unwrap();
+    let apply_flow = apply_dialog.click("row", apply_idx, &mut ctx);
+    assert!(matches!(apply_flow, Flow::CloseAll));
+    assert_eq!(
+        tako_themes::selected(&ctx.paths.themes()).as_deref(),
+        Some(theme_id)
+    );
+}
+
+#[test]
+fn create_theme_duplicate_prompts_overwrite_and_replaces() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, mut ctx) = ctx();
+
+    // 1. Cria o primeiro tema
+    let flow1 = finish_create_theme(&mut ctx, "Tema Duplicado", None, None, false);
+    assert!(matches!(flow1, Flow::Replace(_)));
+
+    // 2. Tentar criar com o mesmo nome sem overwrite abre diálogo de confirmação
+    let flow2 = finish_create_theme(&mut ctx, "Tema Duplicado", None, None, false);
+    let Flow::Push(mut confirm_dialog) = flow2 else {
+        panic!("esperava diálogo de confirmação de substituição");
+    };
+    let confirm_rows = confirm_dialog.render(&ctx).rows;
+    let overwrite_idx = confirm_rows
+        .iter()
+        .position(|r| r.key == "overwrite")
+        .unwrap();
+    let cancel_idx = confirm_rows.iter().position(|r| r.key == "cancel").unwrap();
+    assert_eq!(
+        confirm_rows[overwrite_idx].title,
+        ctx.t("settings.appearance.theme_overwrite_button")
+    );
+    assert_eq!(confirm_rows[cancel_idx].title, ctx.t("common.cancel"));
+
+    // 3. Confirmar a substituição substitui com sucesso e abre diálogo de aplicar
+    let flow_overwrite = confirm_dialog.click("row", overwrite_idx, &mut ctx);
+    assert!(matches!(flow_overwrite, Flow::Replace(_)));
+}
+
+#[test]
+fn themes_panel_shows_export_action_and_base_choice_lists_installed_theme() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, mut ctx) = ctx();
+
+    // Cria um tema baseado em tokens
+    let _ = finish_create_theme(&mut ctx, "Tema Base Customizado", None, None, false);
+    ctx.reload_theme_cache();
+
+    // 1. Em themes_panel, a ação "Exportar .takotheme…" deve estar presente
+    let t_panel = themes_panel(&ctx);
+    let t_items = t_panel.items(&ctx);
+    let export_opt = find(&t_items, "export-theme");
+    assert_eq!(
+        export_opt.row.title,
+        ctx.t("settings.appearance.export_theme")
+    );
+
+    // 2. Na escolha de base para novo tema, o tema instalado aparece como opção
+    let b_panel = choose_base_theme_panel(&ctx);
+    let b_items = b_panel.items(&ctx);
+    assert!(
+        b_items
+            .iter()
+            .any(|i| i.row.key == "base-tema-base-customizado")
+    );
+}
+
+#[test]
+fn create_theme_with_image_passes_theme_check_and_has_no_source_name() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, mut ctx) = ctx();
+
+    // Cria imagem de teste
+    let src_dir = ctx.paths.themes().join("src_test");
+    std::fs::create_dir_all(&src_dir).unwrap();
+    let img_path = src_dir.join("wallpaper.png");
+    let img = image::RgbaImage::new(16, 16);
+    img.save(&img_path).unwrap();
+
+    let mut d = current_draft(&ctx);
+    d.background_image = Some("wallpaper.png".into());
+    d.background_source_name = Some("meu_wallpaper_original.png".into());
+    d.draft_dir = Some(src_dir.clone());
+    ctx.theme_draft = Some(d);
+
+    let flow = finish_create_theme(&mut ctx, "Tema Com Imagem", None, None, false);
+    assert!(matches!(flow, Flow::Replace(_)));
+
+    let theme_dir = ctx.paths.themes().join("tema-com-imagem");
+    assert!(theme_dir.join("background.png").is_file());
+
+    let tokens_text = std::fs::read_to_string(theme_dir.join("tokens.toml")).unwrap();
+    assert!(!tokens_text.contains("custom-background-name"));
+    assert!(!tokens_text.contains("meu_wallpaper_original.png"));
+
+    let check_res = crate::theme::check(&theme_dir);
+    assert!(
+        check_res.is_ok(),
+        "theme check falhou no tema com imagem: {:?}",
+        check_res.err()
+    );
+}
+
+#[test]
+fn discard_theme_draft_cleans_base_overrides_different_from_selected() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // Tema ativo é default (ou None)
+    assert_eq!(tako_themes::selected(&ctx.paths.themes()), None);
+
+    let base_id = "tema-base-diferente";
+    let base_ov_dir = tako_themes::overrides::override_dir(&ctx.paths.themes(), Some(base_id));
+    std::fs::create_dir_all(&base_ov_dir).unwrap();
+    let draft_file = base_ov_dir.join("background.draft.png");
+    std::fs::write(&draft_file, b"DRAFT_IMAGE_CONTENT").unwrap();
+    assert!(draft_file.is_file());
+
+    let mut d = current_draft(&ctx);
+    d.background_image = Some("background.draft.png".into());
+    d.draft_dir = Some(base_ov_dir.clone());
+    ctx.theme_draft = Some(d);
+
+    // Descarta o rascunho
+    ctx.discard_theme_draft();
+    assert!(ctx.theme_draft.is_none());
+
+    // Confere que o arquivo de rascunho na pasta da base foi apagado sem vazar
+    assert!(
+        !draft_file.exists(),
+        "rascunho vazou na pasta da base diferente da selecionada"
+    );
+}
+
+#[test]
+fn overwrite_dialog_shows_existing_theme_name_and_suggests_unique() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, mut ctx) = ctx();
+
+    let _ = finish_create_theme(&mut ctx, "Meu Tema Existente", None, None, false);
+
+    // Tenta criar de novo com mesmo nome
+    let flow = finish_create_theme(&mut ctx, "Meu Tema Existente", None, None, false);
+    let Flow::Push(mut confirm_dialog) = flow else {
+        panic!("esperava diálogo de confirmação");
+    };
+
+    let rendered = confirm_dialog.render(&ctx);
+    assert!(
+        rendered.text.contains("Meu Tema Existente"),
+        "diálogo deveria conter o nome do tema existente: {}",
+        rendered.text
+    );
+
+    let rows = rendered.rows;
+    assert!(rows.iter().any(|r| r.key == "overwrite"));
+    // O id livre vai no texto; o botão fica curto para caber no painel do diálogo.
+    assert!(
+        rendered.text.contains("meu-tema-existente-2"),
+        "{}",
+        rendered.text
+    );
+    assert!(rows.iter().any(|r| r.key == "suggest"));
+
+    // Clica em suggest para salvar com id livre
+    let suggest_idx = rows.iter().position(|r| r.key == "suggest").unwrap();
+    let flow_suggest = confirm_dialog.click("row", suggest_idx, &mut ctx);
+    assert!(matches!(flow_suggest, Flow::Replace(_)));
+
+    assert!(ctx.paths.themes().join("meu-tema-existente-2").is_dir());
+}
+
+#[test]
+fn cannot_overwrite_reserved_theme_offers_only_suggest() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, mut ctx) = ctx();
+
+    // Cria tema simulando o extra reservado tako-fita na pasta de temas
+    let fita_dir = ctx.paths.themes().join("tako-fita");
+    std::fs::create_dir_all(&fita_dir).unwrap();
+    std::fs::write(
+        fita_dir.join("theme.toml"),
+        "id = \"tako-fita\"\nname = \"Tako Fita\"\nversion = \"1.0\"\nauthor = \"Tako\"\napi = 1\nentry = \"main.slint\"\n",
+    ).unwrap();
+
+    // Tenta criar passando custom_id="tako-fita" ou nome que derive para ele
+    let flow = finish_create_theme(&mut ctx, "Fita", Some("tako-fita"), None, false);
+    let Flow::Push(dlg) = flow else {
+        panic!("esperava diálogo");
+    };
+
+    let rows = dlg.render(&ctx).rows;
+    // Não deve oferecer o botão de sobrescrever!
+    assert!(!rows.iter().any(|r| r.key == "overwrite"));
+    assert!(rows.iter().any(|r| r.key == "suggest"));
+}
+
+#[test]
+fn console_mode_row_displays_status_and_triggers_check() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // 1. Estado inicial: não instalado
+    super::integrations::set_status_for_test(
+        tako_core::console_mode::ConsoleModeStatus::NaoInstalado,
+    );
+    let rows = rows_of(&ctx, "integrations");
+    let cm_row = find(&rows, "console-mode");
+    assert_eq!(
+        cm_row.row.title,
+        ctx.t("settings.integrations.console_mode")
+    );
+    assert_eq!(
+        cm_row.row.value,
+        ctx.t("settings.integrations.console_mode_not_installed")
+    );
+
+    // 2. Estado instalado com API v1
+    super::integrations::set_status_for_test(
+        tako_core::console_mode::ConsoleModeStatus::Instalado {
+            versao_api: 1,
+            capacidades: vec!["tv".into(), "fps".into()],
+        },
+    );
+    let rows = rows_of(&ctx, "integrations");
+    let cm_row = find(&rows, "console-mode");
+    assert_eq!(
+        cm_row.row.value,
+        ctx.tf(
+            "settings.integrations.console_mode_installed",
+            &[("version", "1")]
+        )
+    );
+
+    // 3. Estado incompatível
+    super::integrations::set_status_for_test(
+        tako_core::console_mode::ConsoleModeStatus::Incompativel {
+            versao: "2.0".into(),
+        },
+    );
+    let rows = rows_of(&ctx, "integrations");
+    let cm_row = find(&rows, "console-mode");
+    assert_eq!(
+        cm_row.row.value,
+        ctx.t("settings.integrations.console_mode_incompatible")
+    );
+    assert_eq!(cm_row.row.style, "warning");
+
+    // 4. Estado de erro
+    super::integrations::set_status_for_test(tako_core::console_mode::ConsoleModeStatus::Erro);
+    let rows = rows_of(&ctx, "integrations");
+    let cm_row = find(&rows, "console-mode");
+    assert_eq!(
+        cm_row.row.value,
+        ctx.t("settings.integrations.console_mode_error")
+    );
+    assert_eq!(cm_row.row.style, "error");
+
+    // 5. Ação de verificar de novo
+    assert_eq!(
+        cm_row.row.action,
+        ctx.t("settings.integrations.console_mode_check_again")
+    );
+    let flow = accept(&mut ctx, &cm_row);
+    assert!(matches!(flow, Flow::Stay));
+}
+
+#[test]
+fn console_mode_row_displays_checking_when_verifying() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, ctx) = ctx();
+
+    super::integrations::set_checking_for_test(true);
+    let rows = rows_of(&ctx, "integrations");
+    let cm_row = find(&rows, "console-mode");
+    assert_eq!(
+        cm_row.row.value,
+        ctx.t("settings.integrations.console_mode_checking")
+    );
+    assert!(!cm_row.row.enabled);
+    assert_eq!(
+        cm_row.row.action,
+        ctx.t("settings.integrations.console_mode_check_again")
+    );
+    super::integrations::set_checking_for_test(false);
+}
+
+#[test]
+fn console_mode_custom_detector_is_invoked() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    super::integrations::set_detector_for_test(|| {
+        tako_core::console_mode::ConsoleModeStatus::Instalado {
+            versao_api: 1,
+            capacidades: vec!["custom".into()],
+        }
+    });
+    super::integrations::check_now(&mut ctx);
+    let rows = rows_of(&ctx, "integrations");
+    let cm_row = find(&rows, "console-mode");
+    assert_eq!(
+        cm_row.row.value,
+        ctx.tf(
+            "settings.integrations.console_mode_installed",
+            &[("version", "1")]
+        )
+    );
+}
+
+#[test]
+fn test_create_theme_preview_timeout_returns_to_create_editor_panel() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, ctx) = ctx();
+    let mut shell = Shell::new(ctx);
+
+    let draft = tako_themes::overrides::ThemeTokensOverride {
+        accent: Some("#6C5CE7".into()),
+        ..Default::default()
+    };
+    let flow = theme_preview::start_override_create(&mut shell.ctx, Some("base-tema"), draft);
+    let Flow::Replace(layer) = flow else {
+        panic!("esperava Flow::Replace ao iniciar prévia");
+    };
+    shell.push_layer(layer);
+
+    // Simula expiração da prévia chamando end_theme_preview
+    shell.end_theme_preview(true);
+
+    // A camada restaurada DEVE ser o editor de criação ("Criar tema"), NÃO o editor de personalização ("Editar tema")
+    assert_eq!(
+        shell.layers.last().unwrap().render(&shell.ctx).title,
+        shell.ctx.t("settings.appearance.create_theme")
+    );
+}
+
+#[test]
+fn test_prompt_theme_name_cancel_discards_draft() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    ctx.theme_draft = Some(tako_themes::overrides::ThemeTokensOverride {
+        accent: Some("#FF0000".into()),
+        ..Default::default()
+    });
+    assert!(ctx.theme_draft.is_some());
+
+    // Vindo do editor: cancelar o nome volta ao editor com as edições intactas.
+    let mut prompt = prompt_theme_name(&ctx, None, false);
+    let flow = prompt.click("cancel", 0, &mut ctx);
+    assert!(matches!(flow, Flow::Close));
+    assert!(ctx.theme_draft.is_some(), "o editor ainda usa o rascunho");
+
+    // Vindo da prévia: não há editor embaixo, então o rascunho é descartado.
+    let mut prompt = prompt_theme_name(&ctx, None, true);
+    let flow = prompt.click("cancel", 0, &mut ctx);
+    assert!(matches!(flow, Flow::Close));
+    assert!(
+        ctx.theme_draft.is_none(),
+        "rascunho deveria ser descartado no cancel do nome"
+    );
+}
+
+#[test]
+fn test_edit_theme_panel_discards_foreign_draft_dir() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // Rascunho com draft_dir apontando para outro tema
+    let foreign_dir = ctx.paths.themes().join("outro-tema").join("overrides");
+    ctx.theme_draft = Some(tako_themes::overrides::ThemeTokensOverride {
+        accent: Some("#00FF00".into()),
+        draft_dir: Some(foreign_dir),
+        ..Default::default()
+    });
+
+    // Abrir edit_theme_panel deve descartar o rascunho de outro tema
+    let _panel = edit_theme_panel(&mut ctx);
+    assert!(
+        ctx.theme_draft.is_none(),
+        "edit_theme_panel não descartou rascunho de outro tema"
+    );
+}
+
+#[test]
+fn test_finish_create_theme_invalidates_themes_cache() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    // Aquece o cache
+    let before = cached_themes(&ctx);
+    assert!(!before.installed.iter().any(|t| t.id() == "tema-novo-cache"));
+
+    // Cria tema
+    let flow = finish_create_theme(&mut ctx, "Tema Novo Cache", None, None, false);
+    assert!(matches!(flow, Flow::Replace(_)));
+
+    // O cache deve ter sido esquecido e a nova leitura já contém o tema novo imediatamente
+    let after = cached_themes(&ctx);
+    assert!(after.installed.iter().any(|t| t.id() == "tema-novo-cache"));
+}
+
+#[test]
+fn test_desktop_mode_hides_live_preview() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    ctx.desktop = true;
+    let panel_desk = edit_theme_panel(&mut ctx);
+    let items_desk = panel_desk.items(&ctx);
+    assert!(!items_desk.iter().any(|i| i.row.key == "preview"));
+
+    ctx.desktop = false;
+    let panel_bp = edit_theme_panel(&mut ctx);
+    let items_bp = panel_bp.items(&ctx);
+    assert!(items_bp.iter().any(|i| i.row.key == "preview"));
+}
+
+#[test]
+fn test_theme_with_empty_author_does_not_show_by_suffix() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    tako_core::i18n::set_lang(tako_core::i18n::Lang::PtBr);
+    let (_d, ctx) = ctx();
+
+    let t_dir = ctx.paths.themes().join("tema-sem-autor");
+    std::fs::create_dir_all(&t_dir).unwrap();
+    std::fs::write(
+        t_dir.join("theme.toml"),
+        "id = \"tema-sem-autor\"\nname = \"Sem Autor\"\nversion = \"1.2.3\"\nauthor = \"\"\napi = 1\nentry = \"main.slint\"\ncreated-by-tako = true\n",
+    ).unwrap();
+    std::fs::write(
+        t_dir.join("main.slint"),
+        "export { App, Ui, Hint, PanelRow } from \"@tako/main.slint\";\n",
+    )
+    .unwrap();
+    forget(THEMES_CACHE);
+
+    let panel = themes_panel(&ctx);
+    let items = panel.items(&ctx);
+    let item = items
+        .iter()
+        .find(|i| i.row.key == "tema-sem-autor")
+        .unwrap();
+    assert_eq!(item.row.description, "versão 1.2.3");
+    assert!(!item.row.description.contains(" · "));
+    assert!(!item.row.description.contains("por "));
+}
+
+#[test]
+fn fse_status_cache_keeps_last_success_and_retries_transient_results() {
+    use tako_platform::fse::Status;
+    let mut state = super::FseState::default();
+    assert!(state.begin());
+    assert!(!state.begin(), "only one status query at a time");
+    state.finish(Ok(Status::Enabled));
+    assert!(!state.begin(), "successful status is cached");
+    state.checked = None;
+    assert!(state.begin());
+    state.finish(Err("busy".into()));
+    assert_eq!(state.status, Some(Status::Enabled));
+    assert!(state.checked.expect("retry time").elapsed() >= std::time::Duration::from_secs(29));
+    state.checked = Some(std::time::Instant::now() - std::time::Duration::from_secs(31));
+    assert!(state.begin());
+    state.finish(Ok(Status::Applying));
+    assert_eq!(state.status, Some(Status::Applying));
+    assert!(state.checked.expect("retry time").elapsed() >= std::time::Duration::from_secs(29));
+}
+
+#[test]
+fn fse_panel_keeps_status_and_ignores_clicks_while_applying() {
+    let _guard = LOCK.lock().unwrap();
+    let (_dir, mut ctx) = ctx();
+    FSE.with(|state| {
+        *state.borrow_mut() = FseState {
+            status: Some(tako_platform::fse::Status::Enabled),
+            pending: true,
+            ..Default::default()
+        };
+    });
+    let panel = xbox_mode_panel(&ctx);
+    let rows = (panel.build)(&ctx);
+    assert_eq!(
+        rows[0].row.description,
+        ctx.t("settings.general.fse_applying")
+    );
+    assert!(matches!(accept(&mut ctx, &rows[0]), Flow::Stay));
+    FSE.with(|state| {
+        assert!(state.borrow().pending);
+        assert_eq!(
+            state.borrow().status,
+            Some(tako_platform::fse::Status::Enabled)
+        );
+        *state.borrow_mut() = FseState::default();
+    });
+}
+
+/// Linha e número do pedido que o desenho manda para o pisca (`settings-flash`, `settings-flash-nonce`).
+fn flash_of(page: &mut SettingsPage, ctx: &Ctx) -> (i32, i32) {
+    let mut out = Out::default();
+    page.render(ctx, &mut out);
+    let get = |name: &str| match out.props.iter().find(|(n, _)| *n == name) {
+        Some((_, slint_interpreter::Value::Number(n))) => *n as i32,
+        _ => panic!("sem {name}"),
+    };
+    (get("settings-flash"), get("settings-flash-nonce"))
+}
+
+#[test]
+fn a_link_to_a_row_flashes_it_until_the_next_input() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    ctx.desktop = true;
+    let key = "settings.appearance.transparency";
+    let want = rows_of(&ctx, "appearance")
+        .iter()
+        .position(|i| i.row.key == key)
+        .unwrap() as i32;
+    let mut page = SettingsPage::at_row("appearance", key);
+    let (row, nonce) = flash_of(&mut page, &ctx);
+    assert_eq!(row, want);
+    assert!(nonce > 0);
+    // O mesmo link de novo pisca de novo (o número do pedido muda); uma linha que não existe não pisca.
+    assert_ne!(
+        flash_of(&mut SettingsPage::at_row("appearance", key), &ctx).1,
+        nonce
+    );
+    assert_eq!(
+        flash_of(&mut SettingsPage::at_row("appearance", "nada"), &ctx).0,
+        -1
+    );
+    // Qualquer entrada apaga o pisca; sem link, nada pisca.
+    page.handle(Cmd::Down, &mut ctx);
+    assert_eq!(flash_of(&mut page, &ctx), (-1, 0));
+    assert_eq!(flash_of(&mut SettingsPage::at("appearance"), &ctx), (-1, 0));
+}
+
+#[test]
+fn the_settings_route_accepts_a_row_after_the_category() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, ctx) = ctx();
+    let mut shell = Shell::new(ctx);
+    shell.enter_desktop();
+    shell.open_route("settings:appearance/settings.appearance.transparency");
+    assert_eq!(shell.page().kind(), "settings");
+}
+
+/// Configurações › Tema (TelaTema): só no desktop, com os cinco temas e as nove cores em cartões que se escolhem.
+#[test]
+fn the_theme_category_is_desktop_only_and_its_cards_pick_theme_and_accent() {
+    use crate::desk_theme as dt;
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+    let mut page = SettingsPage::new();
+    ctx.desktop = false;
+    page.render(&ctx, &mut Out::default());
+    assert!(!page.cats.iter().any(|c| c.id == "theme"));
+    ctx.desktop = true;
+    page.render(&ctx, &mut Out::default());
+    assert_eq!(page.cats[1].id, "theme");
+
+    // TAKO: sem a cor de destaque (vem da arte); cinco cartões com o tema atual marcado.
+    let rows = rows_of(&ctx, "theme");
+    assert!(rows.iter().all(|i| i.row.key != "desk-accent"));
+    let themes = find(&rows, "desk-theme");
+    assert_eq!(themes.cards.len(), dt::THEMES.len());
+    assert_eq!(
+        themes.cards.iter().position(|c| c.on),
+        Some(0),
+        "TAKO é o padrão"
+    );
+    assert!(rows.iter().any(|i| i.row.key == "desk-preview"));
+    assert!(!find(&rows, "desk-preview").row.is_focusable());
+
+    // A prévia fica visível na categoria, mas não aparece como resultado de busca.
+    let preview = find(&rows, "desk-preview");
+    let mut page = SettingsPage::at("theme");
+    page.query = preview.row.value.clone();
+    assert!(page.items(&ctx).iter().all(|i| i.row.kind != "preview"));
+    assert_eq!(page.matches_in(&ctx, page.cat), 0);
+
+    // Escolher o Liquid Glass troca o tema, mostra as cores e as opções dele; fora da faixa, nada muda.
+    let _ = themes.pick_zone("row-pick:4", &mut ctx);
+    assert!(themes.pick_zone("row-pick:9", &mut ctx).is_none());
+    assert_eq!(dt::theme(&ctx.settings), dt::GLASS);
+    let rows = rows_of(&ctx, "theme");
+    assert!(rows.iter().any(|i| i.row.key == "glass-opacity"));
+    let accents = find(&rows, "desk-accent");
+    assert_eq!(accents.cards.len(), dt::ACCENTS.len());
+    assert!(!accents.row.on, "a cor padrão é uma das nove");
+    let _ = accents.pick_zone("row-pick:3", &mut ctx);
+    assert_eq!(dt::accent(&ctx.settings), dt::ACCENTS[3].0);
+    let accents = find(&rows_of(&ctx, "theme"), "desk-accent");
+    assert_eq!(accents.cards.iter().position(|c| c.on), Some(3));
+
+    // ← → andam entre os temas e as cores, sem dar a volta.
+    adjust(&mut ctx, &accents, 1);
+    assert_eq!(dt::accent(&ctx.settings), dt::ACCENTS[4].0);
+    let themes = find(&rows_of(&ctx, "theme"), "desk-theme");
+    adjust(&mut ctx, &themes, 1);
+    assert_eq!(dt::theme(&ctx.settings), dt::GLASS);
+    adjust(&mut ctx, &themes, -1);
+    assert_eq!(dt::theme(&ctx.settings), 3);
+
+    // Ao sair de uma cor própria, a seta parte para a primeira ou a última opção, conforme a direção.
+    ctx.settings.set(dt::ACCENT, "#123456");
+    let accents = find(&rows_of(&ctx, "theme"), "desk-accent");
+    adjust(&mut ctx, &accents, 1);
+    assert_eq!(dt::accent(&ctx.settings), dt::ACCENTS[0].0);
+    ctx.settings.set(dt::ACCENT, "#123456");
+    let accents = find(&rows_of(&ctx, "theme"), "desk-accent");
+    adjust(&mut ctx, &accents, -1);
+    assert_eq!(
+        dt::accent(&ctx.settings),
+        dt::ACCENTS[dt::ACCENTS.len() - 1].0
+    );
+}
+
+#[test]
+fn desktop_appearance_names_the_fullscreen_theme_clearly() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let (_d, mut ctx) = ctx();
+
+    ctx.desktop = true;
+    let row = find(&rows_of(&ctx, "appearance"), "theme");
+    assert_eq!(row.row.title, ctx.t("settings.appearance.fullscreen_theme"));
+    assert_eq!(
+        row.row.description,
+        ctx.t("settings.appearance.fullscreen_theme_desc")
+    );
+
+    ctx.desktop = false;
+    let row = find(&rows_of(&ctx, "appearance"), "theme");
+    assert_eq!(row.row.title, ctx.t("settings.appearance.theme"));
+    assert_eq!(row.row.description, ctx.t("settings.appearance.theme_desc"));
+}

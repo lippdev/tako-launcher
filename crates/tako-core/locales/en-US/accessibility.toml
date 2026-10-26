@@ -1,0 +1,5 @@
+[accessibility]
+text_size = "Text size"
+sound_volume = "Navigation sound volume"
+sound_desc = "0% turns sounds off. Short local navigation tones; never play during a game."
+sound_muted = "Muted"

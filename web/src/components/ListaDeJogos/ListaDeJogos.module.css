@@ -1,0 +1,345 @@
+/* A lista fixa da biblioteca. A largura (292, ou 76 recolhida) é de quem a coloca; a lista preenche o espaço. */
+.list {
+  --row-height: var(--list-row-height);
+  --row-gap: var(--list-row-gap);
+  --icon-box: var(--list-icon-size);
+  --icon-radius: var(--radius-thumb);
+
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Recolhida: só ícones de 46 (raio 11) em linhas de 52, com 4 entre elas. */
+.collapsed {
+  --row-height: var(--list-row-height-collapsed);
+  --row-gap: var(--list-row-gap-collapsed);
+  --icon-box: var(--list-icon-size-collapsed);
+  --icon-radius: var(--radius-button);
+}
+
+.viewport {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 0 var(--space-12);
+}
+
+.viewport:focus-visible {
+  outline: none;
+}
+
+/* Espaçador com a altura da lista inteira; as linhas ficam posicionadas dentro dele por transform. */
+.spacer {
+  position: relative;
+  width: 100%;
+}
+
+.row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  height: var(--row-height);
+  padding: 0 var(--space-6) 0 var(--space-8);
+  border: 1px solid transparent;
+  border-radius: var(--radius-row);
+  cursor: pointer;
+  transition:
+    background-color var(--tempo-hover) var(--curva-estado),
+    border-color var(--tempo-hover) var(--curva-estado);
+}
+
+/* Hover: no TAKO, a cor de destaque a 6%; nos outros temas, branco 5%. */
+.row:hover {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+/* Escolhida (e marcada): no TAKO, degradê da cor de destaque (17% → 5%); nos outros, branco 9% com contorno 8%. */
+.active,
+.active:hover {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 17%, transparent), color-mix(in srgb, var(--accent) 5%, transparent));
+  border-color: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+:global([data-theme]:not([data-theme="tako"])) .row:hover {
+  background: var(--glass-hover);
+}
+
+:global([data-theme]:not([data-theme="tako"])) .active,
+:global([data-theme]:not([data-theme="tako"])) .active:hover {
+  background: var(--glass-selected);
+  border-color: var(--glass-item-edge);
+}
+
+/* Liquid Glass: a escolhida com o contorno e o reflexo do vidro escolhido; hover a 7%. */
+:global(:root[data-theme="vidro"]) .row:hover {
+  background: var(--vidro-row-hover);
+}
+
+:global(:root[data-theme="vidro"]) .active,
+:global(:root[data-theme="vidro"]) .active:hover {
+  border-color: var(--vidro-row-edge);
+  box-shadow: var(--vidro-selected-spec);
+}
+
+/* O foco fica na lista; o anel aparece na linha que o teclado escolheu. Fino (1) para não pesar sobre a linha
+   escolhida, que já tem fundo e contorno próprios. */
+.viewport:focus-visible .focused {
+  outline: 1px solid var(--focus-ring);
+  outline-offset: -1px;
+}
+
+.check {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--list-check-size);
+  height: var(--list-check-size);
+  margin-right: calc(var(--space-12) * -0.5);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--space-4);
+  background: var(--glass-control);
+}
+
+.checked {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.check svg {
+  width: calc(var(--list-check-size) - 4px);
+  height: calc(var(--list-check-size) - 4px);
+  stroke-width: 2.4;
+}
+
+.icon {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--icon-box);
+  height: var(--icon-box);
+  overflow: hidden;
+  border-radius: var(--icon-radius);
+  background: var(--settings-control-hover);
+  transition: box-shadow var(--tempo-estado) var(--curva-estado);
+}
+
+.img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 30%;
+}
+
+.initial {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.collapsed .initial {
+  font-size: 16px;
+}
+
+/* Não instalado: ícone apagado e nome em cinza. */
+.notInstalled .img {
+  filter: grayscale(0.8) brightness(0.7);
+}
+
+.notInstalled .name {
+  color: var(--text-muted);
+}
+
+/* Barra do download no pé do ícone: cresce por scaleX, nunca por width. */
+.prog {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--list-progress-height);
+  background: color-mix(in srgb, var(--canvas) 60%, transparent);
+}
+
+.prog b {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--accent);
+  transform-origin: left;
+  transition: transform var(--tempo-estado) var(--curva-estado);
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.end {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.pct {
+  margin-right: var(--space-4);
+  font-size: 12px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Ponto de atualização (cor de destaque) e de "jogando" (verde, que é só para "ligado"). O texto vem na dica e
+   para o leitor de tela: a cor nunca vai sozinha. */
+.dot {
+  width: var(--list-dot-size);
+  height: var(--list-dot-size);
+  margin-right: var(--space-6);
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.running {
+  background: var(--success);
+}
+
+.cornerDot {
+  display: none;
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  width: var(--list-dot-size);
+  height: var(--list-dot-size);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--canvas);
+}
+
+.cornerDot.running {
+  background: var(--success);
+}
+
+/* Recolhida: sem nome nem fim de linha (o nome fica só para leitores de tela), sem fundo; o escolhido ganha anel. */
+.collapsed .row {
+  justify-content: center;
+  padding: 0;
+  border-color: transparent;
+  background: none;
+}
+
+.collapsed .name,
+.collapsed .end {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.collapsed .cornerDot {
+  display: block;
+}
+
+.collapsed .row:not(.active):not(:hover) .img {
+  filter: grayscale(1) brightness(0.8);
+}
+
+.collapsed .active .icon {
+  box-shadow:
+    0 0 0 2px var(--canvas),
+    0 0 0 3px var(--glass-edge-strong);
+}
+
+.collapsed .row.active,
+.collapsed .row:hover {
+  background: none;
+  border-color: transparent;
+}
+
+/* Lista vazia: o polvo (44, 75%) e uma frase. */
+.empty {
+  margin: 0;
+  padding: 30px var(--space-8);
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.emptyMark {
+  display: block;
+  width: var(--list-icon-size-collapsed);
+  height: auto;
+  margin: 0 auto var(--space-12);
+  opacity: 0.75;
+}
+
+.collapsed .empty {
+  font-size: 0;
+}
+
+/* Carregando: os mesmos tamanhos da linha, em branco 6% pulsando (só opacity). */
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  height: var(--row-height);
+  margin-bottom: var(--row-gap);
+  padding: 0 var(--space-6) 0 var(--space-8);
+}
+
+.collapsed .skeletonRow {
+  justify-content: center;
+  padding: 0;
+}
+
+.skeleton {
+  display: block;
+  background: var(--skeleton);
+  animation: pulse var(--tempo-pulso) ease infinite;
+}
+
+.skeletonIcon {
+  flex: none;
+  width: var(--icon-box);
+  height: var(--icon-box);
+  border-radius: var(--icon-radius);
+}
+
+.skeletonName {
+  height: 10px;
+  border-radius: var(--space-6);
+}
+
+.collapsed .skeletonName {
+  display: none;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* Texto só para leitor de tela. */
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

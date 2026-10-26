@@ -1,0 +1,64 @@
+// Spike MIG-001: grade de capas carregada em tempo de execução pelo slint-interpreter.
+export struct Row { first: int, count: int }
+
+export component App inherits Window {
+    in property <[Row]> rows;
+    in property <int> focus-row;
+    in property <int> focus-col;
+    in property <string> stats;
+    callback navigate(string);
+    pure callback cover-image(int) -> image;
+    property <length> tile-w: 180px;
+    property <length> tile-h: 270px;
+    property <length> gap: 24px;
+    property <length> row-h: tile-h + gap;
+    preferred-width: 1920px;
+    preferred-height: 1080px;
+    background: #101318;
+    title: "Tako spike";
+
+    list := Flickable {
+        y: 80px;
+        height: parent.height - 80px;
+        interactive: false;
+        content-height: rows.length * row-h;
+        // Centra a linha focada; a animação dá o "foco animado".
+        content-y: min(0px, max(self.height - self.content-height, -(focus-row * row-h) + (self.height - row-h) / 2));
+        animate content-y { duration: 180ms; easing: ease-out; }
+        // Virtualização manual: só as linhas visíveis existem.
+        for row[r] in rows: Rectangle {
+            property <bool> visible-row: (r * row-h + list.content-y) > -row-h && (r * row-h + list.content-y) < list.height;
+            y: r * row-h;
+            height: row-h;
+            if visible-row: HorizontalLayout {
+                padding-left: 48px;
+                spacing: gap;
+                alignment: start;
+                for c in row.count: Rectangle {
+                    width: tile-w;
+                    height: tile-h;
+                    border-radius: 8px;
+                    clip: true;
+                    property <bool> focused: r == focus-row && c == focus-col;
+                    Image { source: root.cover-image(row.first + c); width: parent.width; height: parent.height; image-fit: cover; }
+                    Rectangle {
+                        border-width: focused ? 4px : 0px;
+                        border-color: #4fc3f7;
+                        border-radius: 8px;
+                        animate border-width { duration: 120ms; }
+                    }
+                }
+            }
+        }
+    }
+    FocusScope {
+        key-pressed(e) => {
+            if (e.text == Key.UpArrow) { root.navigate("up"); return accept; }
+            if (e.text == Key.DownArrow) { root.navigate("down"); return accept; }
+            if (e.text == Key.LeftArrow) { root.navigate("left"); return accept; }
+            if (e.text == Key.RightArrow) { root.navigate("right"); return accept; }
+            reject
+        }
+    }
+    Text { x: 48px; y: 24px; text: stats; color: #e0e0e0; font-size: 20px; }
+}

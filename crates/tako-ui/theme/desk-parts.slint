@@ -1,0 +1,150 @@
+// Peças pequenas que o desktop e a Visão geral (desk-overview.slint) dividem: ícone, foco, dica, bloco de espera e
+// os dados que viajam do Tako. Ficam num arquivo à parte para os dois se importarem sem ciclo.
+import { Ui } from "tokens.slint";
+import { DeskGlyphs } from "desk-icons.slint";
+
+export struct DeskGameView { has-game: bool, title: string, overline: string, description: string, art: image, art-blur: image, art-lum: [float], logo: image, accent: color, hint: string, install-note: string, install-warn: bool, running: bool, trailer: bool, art-loading: bool, show-logo: bool, title-pending: bool, progress: float, store-icon: string, store-name: string, play-status: string, play-status-label: string }
+export struct DeskInfo { icon: string, label: string, value: string, detail: string, dot: bool, chips: [string], score: int }
+export struct DeskBar { label: string, value: string, fraction: float, today: bool, future: bool }
+export struct DeskEntry { id: string, title: string, detail: string, note: string, value: string, thumb: image, accent: color, fraction: float, dot: bool, header: bool, row: int }
+
+// Ícone do desktop: cor opaca com a transparência no elemento inteiro (com a cor translúcida no traço, o femtovg
+// somava a transparência onde os traços se cruzam e o ícone parecia ter contorno) e pontas e cantos redondos,
+// como os SVG das prévias. A tela cheia continua com o `Icon` dela.
+export component DeskIcon inherits Rectangle {
+    in property <string> name;
+    in property <color> tint: Ui.desk-text;
+    in property <length> size: 20px;
+    width: size;
+    height: size;
+    opacity: tint.to-hsv().alpha;
+    // Logos de loja vêm do SVG com colorize: o Path com furos do femtovg deixa um contorno nas bordas.
+    property <bool> store: !(name != "store-steam" && name != "store-epic" && name != "store-gog" && name != "store-ubisoft" && name != "store-ea" && name != "store-battlenet" && name != "store-amazon" && name != "store-xbox" && name != "store-manual");
+    if name == "store-steam": Image { width: size; height: size; source: @image-url("stores/steam.svg"); colorize: tint.with-alpha(1); }
+    if name == "store-epic": Image { width: size; height: size; source: @image-url("stores/epic.svg"); colorize: tint.with-alpha(1); }
+    if name == "store-gog": Image { width: size; height: size; source: @image-url("stores/gog.svg"); colorize: tint.with-alpha(1); }
+    if name == "store-ubisoft": Image { width: size; height: size; source: @image-url("stores/ubisoft.svg"); colorize: tint.with-alpha(1); }
+    if name == "store-ea": Image { width: size; height: size; source: @image-url("stores/ea.svg"); colorize: tint.with-alpha(1); }
+    if name == "store-battlenet": Image { width: size; height: size; source: @image-url("stores/battlenet.svg"); colorize: tint.with-alpha(1); }
+    if name == "store-amazon": Image { width: size; height: size; source: @image-url("stores/amazon.svg"); colorize: tint.with-alpha(1); }
+    if name == "store-xbox": Image { width: size; height: size; source: @image-url("stores/xbox.svg"); colorize: tint.with-alpha(1); }
+    if name == "store-manual": Image { width: size; height: size; source: @image-url("stores/manual.svg"); colorize: tint.with-alpha(1); }
+    if !store && DeskGlyphs.stroke(name) != "": Path {
+        width: parent.width;
+        height: parent.height;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        commands: DeskGlyphs.stroke(name);
+        stroke: tint.with-alpha(1);
+        stroke-width: 1.7 * size / 24;
+        stroke-line-cap: round;
+        stroke-line-join: round;
+        fill: transparent;
+    }
+    if !store && DeskGlyphs.fill(name) != "": Path {
+        width: parent.width;
+        height: parent.height;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        commands: DeskGlyphs.fill(name);
+        fill: tint.with-alpha(1);
+    }
+}
+
+// Foco do teclado ou do controle, como na Apple TV: o item clareia (`focus-fill`), ganha um contorno fino
+// (`focus-ring`) e um brilho em volta (`focus-glow`). Nunca muda a geometria; o mouse não mostra.
+export component FocusRing inherits Rectangle {
+    in property <length> radius: Ui.radius-row;
+    border-radius: radius;
+    background: Ui.focus-fill;
+    border-width: 1px;
+    border-color: Ui.focus-ring;
+    Rectangle {
+        x: -Ui.focus-ring-width;
+        y: -Ui.focus-ring-width;
+        width: parent.width + 2 * Ui.focus-ring-width;
+        height: parent.height + 2 * Ui.focus-ring-width;
+        border-radius: root.radius + Ui.focus-ring-width;
+        border-width: Ui.focus-ring-width;
+        border-color: Ui.focus-glow;
+    }
+}
+
+// Dica do mouse (MenusEDicas): aparece 500 ms depois de parar em cima e entra em 120 ms; some ao sair. Botões só
+// de ícone e nomes cortados mostram o texto inteiro aqui.
+export component Tip inherits Rectangle {
+    in property <string> text;
+    in property <bool> hovering;
+    property <bool> show;
+    changed hovering => {
+        show = false;
+        tip-timer.running = hovering && text != "";
+    }
+    tip-timer := Timer {
+        interval: 500ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            show = root.hovering;
+        }
+    }
+    // Abaixo do dono, centralizada; não captura o mouse.
+    if show: Rectangle {
+        property <bool> lit;
+        // Entrada: ligar no `init` não anima (o Slint aplica antes do primeiro quadro); o Timer liga logo depois.
+        Timer {
+            interval: 1ms;
+            running: true;
+            triggered => {
+                self.running = false;
+                lit = true;
+            }
+        }
+        opacity: lit ? 1 : 0;
+        animate opacity { duration: Ui.tempo-foco; easing: Ui.curva-entrada; }
+        x: (root.width - self.width) / 2;
+        y: root.height + 6px;
+        width: tl.preferred-width + 20px;
+        height: 28px;
+        border-radius: Ui.radius-thumb;
+        background: Ui.surface-raised;
+        border-width: 1px;
+        border-color: Ui.line-strong;
+        drop-shadow-offset-y: Ui.shadow-float-y;
+        drop-shadow-blur: Ui.shadow-float-blur;
+        drop-shadow-color: Ui.shadow-float-color;
+        tl := Text { text: root.text; color: Ui.desk-text; font-size: Ui.desk-label-sm; font-weight: 500; }
+    }
+}
+
+// Blocos de espera (EstadoCarregando) no tamanho do que vai chegar; pulsam devagar, parados com "Reduzir animações".
+export component Skeleton inherits Rectangle {
+    in property <length> radius: Ui.radius-thumb;
+    border-radius: radius;
+    background: Ui.glass-control;
+    opacity: Ui.reduce-motion ? 0.8 : 0.55 + 0.45 * abs(sin(animation-tick() / Ui.tempo-pulso * 180deg));
+}
+
+// Anel de progresso (JogarEAbrir): trilha fraca e um arco girando; com "reduzir animações" fica parado.
+export component Ring inherits Rectangle {
+    in property <length> size: 22px;
+    in property <color> tint: Ui.on-primary;
+    width: size;
+    height: size;
+    Rectangle {
+        border-radius: parent.width / 2;
+        border-width: 2px;
+        border-color: tint.with-alpha(0.25);
+    }
+    Path {
+        width: parent.width;
+        height: parent.height;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        commands: "M 12 2 A 10 10 0 0 1 22 12";
+        stroke: tint;
+        stroke-width: 2px;
+        fill: transparent;
+        transform-rotation: Ui.reduce-motion ? 0deg : animation-tick() / 900ms * 360deg;
+    }
+}

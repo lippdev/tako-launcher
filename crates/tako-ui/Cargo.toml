@@ -1,0 +1,34 @@
+[package]
+name = "tako-ui"
+description = "Interface Slint do Tako: telas, foco, animações e ligação com o core."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+tako-core.workspace = true
+tako-themes.workspace = true
+tako-platform = { workspace = true, features = ["gamepad"] }
+tako-sources.workspace = true
+tako-downloads.workspace = true
+slint.workspace = true
+slint-interpreter.workspace = true
+i-slint-core.workspace = true
+toml.workspace = true
+sdl3.workspace = true
+tracing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+image.workspace = true
+chrono.workspace = true
+rfd.workspace = true
+spin_on = "0.1"
+tempfile.workspace = true
+
+[dev-dependencies]
+slint = { workspace = true, features = ["renderer-software"] }
+ureq.workspace = true
+
+[lints]
+workspace = true
