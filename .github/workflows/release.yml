@@ -1,21 +1,18 @@
 name: Release
 
 # Tako em Rust (PRD D-07, MIG-040). Quando sai cada release (regras em build/resolve-release.sh; hífen = pré-release):
-#  - Push na main: estável, com a versão da primeira seção "## [X.Y.Z]" do CHANGELOG.md. Se o topo for pré-release ou a
-#    tag já existir, o workflow para no "resolve" e nada é publicado.
+#  - Só manual durante a alpha (sem lançamento público): sem release automática no push da main nem noturna agendada.
+#    Para voltar, recoloque "push: branches: [main]" e o "schedule" (estão no histórico do git).
+#  - Run workflow na main, canal stable: estável, com a versão da primeira seção "## [X.Y.Z]" do CHANGELOG.md. Se o
+#    topo for pré-release ou a tag já existir, o workflow para no "resolve" e nada é publicado.
 #  - Actions > Release > Run workflow na develop, canal alpha ou beta: a pré-release sai com o próximo número
 #    (0.2.0-alpha.3, 0.2.0-beta.1...). Notas da seção da versão ou, sem ela, da [Unreleased].
 #  - Run workflow em outra branch, com "publish" desmarcado: só compila e guarda os arquivos como artefato.
-#  - Todo dia (agendado) ou Run workflow com o canal nightly: noturna da develop (PLAT-008), só se ela mudou. Ficam as
-#    7 noturnas mais novas. O agendamento do GitHub só roda o arquivo da branch padrão: vale depois de chegar na main.
+#  - Run workflow com o canal nightly: noturna da develop (PLAT-008), só se ela mudou. Ficam as 7 noturnas mais novas.
 # Saída: só Windows (o instalador, com a interface web e o CEF; só x64). Linux e macOS estão pausados durante a alpha
 # (PRD D-20) e voltam na Fase 6 (WEB-80 a WEB-83); o job "unix" e o Packaging do Linux estão no histórico do git.
 # Testes não rodam aqui (PRD D-13): o workflow só empacota.
 on:
-  push:
-    branches: [main]
-  schedule:
-    - cron: "30 5 * * *"
   workflow_dispatch:
     inputs:
       channel:
