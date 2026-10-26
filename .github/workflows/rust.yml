@@ -1,7 +1,8 @@
 name: Rust
 
-# Tako em Rust (PRD §4 e §8.4): fmt, clippy e testes nos três SOs. Durante a migração para a interface web os
-# testes são locais (PRD D-13): só roda quando alguém pede.
+# Tako em Rust (PRD §4 e §8.4): fmt, licenças, clippy e testes. Só Windows durante a alpha (PRD D-20: Linux e macOS
+# pausados até a Fase 6; o benchmark no Linux e a matriz dos três SOs estão no histórico do git). Os testes são locais
+# (PRD D-13): só roda quando alguém pede.
 on:
   workflow_dispatch:
 
@@ -16,13 +17,13 @@ env:
 
 jobs:
   fmt:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - run: cargo fmt --all --check
 
   deny:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2
@@ -31,24 +32,11 @@ jobs:
       - run: cargo deny check licenses
 
   test:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Linux dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libdecor-0-dev libudev-dev \
-            libasound2-dev libpulse-dev libpipewire-0.3-dev libdbus-1-dev libibus-1.0-dev libx11-dev libxext-dev \
-            libxcursor-dev libxrandr-dev libxi-dev libxfixes-dev libxss-dev libxtst-dev libxinerama-dev \
-            libdrm-dev libgbm-dev libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libfontconfig-dev
       - uses: Swatinem/rust-cache@v2
       - name: Gerar MSIX FSE assinado
-        if: runner.os == 'Windows'
         shell: powershell
         run: |
           ./build/rust/Package-Fse.ps1 -OutputDirectory "$env:RUNNER_TEMP/fse"
@@ -70,26 +58,3 @@ jobs:
       - name: Validar instalação e restauração reais
         shell: powershell
         run: ./crates/tako-platform/tests/fse-integration.ps1 -PayloadDirectory "$env:RUNNER_TEMP/fse"
-
-  # MIG-041 (PRD §8.1): números de tendência do app de verdade (1.000 jogos, renderizador por software, Xvfb).
-  # Não reprova por número; só se o Tako não abrir ou travar.
-  bench:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Linux dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libdecor-0-dev libudev-dev \
-            libasound2-dev libpulse-dev libpipewire-0.3-dev libdbus-1-dev libibus-1.0-dev libx11-dev libxext-dev \
-            libxcursor-dev libxrandr-dev libxi-dev libxfixes-dev libxss-dev libxtst-dev libxinerama-dev \
-            libdrm-dev libgbm-dev libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libfontconfig-dev
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo build -p tako --release --locked
-      - name: Benchmark
-        run: |
-          ui=$(timeout 120 xvfb-run -a -s "-screen 0 1920x1080x24" ./target/release/tako --bench --data-dir "$RUNNER_TEMP/bench" | tail -1)
-          sup=$(./target/release/tako --bench-supervisor | tail -1)
-          echo "$ui"; echo "$sup"
-          { echo "### Benchmark (MIG-041)"; echo; echo '```json'; echo "$ui"; echo "$sup"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

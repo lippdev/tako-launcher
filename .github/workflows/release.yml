@@ -8,8 +8,9 @@ name: Release
 #  - Run workflow em outra branch, com "publish" desmarcado: só compila e guarda os arquivos como artefato.
 #  - Todo dia (agendado) ou Run workflow com o canal nightly: noturna da develop (PLAT-008), só se ela mudou. Ficam as
 #    7 noturnas mais novas. O agendamento do GitHub só roda o arquivo da branch padrão: vale depois de chegar na main.
-# Saídas: Windows (só o instalador, com a interface web e o CEF; só x64), Linux (deb, AppImage, tar.gz; x64 e
-# arm64) e macOS (dmg e zip; Apple Silicon e Intel). Testes não rodam aqui (PRD D-13): o workflow só empacota.
+# Saída: só Windows (o instalador, com a interface web e o CEF; só x64). Linux e macOS estão pausados durante a alpha
+# (PRD D-20) e voltam na Fase 6 (WEB-80 a WEB-83); o job "unix" e o Packaging do Linux estão no histórico do git.
+# Testes não rodam aqui (PRD D-13): o workflow só empacota.
 on:
   push:
     branches: [main]
@@ -188,48 +189,8 @@ jobs:
           path: dist/Tako-Setup-${{ matrix.arch }}.exe
           if-no-files-found: error
 
-  unix:
-    needs: resolve
-    if: needs.resolve.outputs.build == 'true'
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { target: linux-x64, runner: ubuntu-22.04 } # glibc 2.35 (PRD §8.2)
-          - { target: linux-arm64, runner: ubuntu-22.04-arm }
-          - { target: macos-arm64, runner: macos-latest } # Apple Silicon
-          - { target: macos-x64, runner: macos-latest } # Intel (compilado no runner Apple Silicon)
-    runs-on: ${{ matrix.runner }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.resolve.outputs.sha }}
-      - name: Linux dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libudev-dev \
-            libasound2-dev libpulse-dev libdbus-1-dev libibus-1.0-dev libx11-dev libxext-dev \
-            libxcursor-dev libxrandr-dev libxi-dev libxfixes-dev libxss-dev libxtst-dev libxinerama-dev \
-            libdrm-dev libgbm-dev libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libfontconfig-dev
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: release-${{ matrix.target }}
-      - name: Build packages
-        env:
-          TAKO_SCREENSCRAPER_DEV_ID: ${{ secrets.SCREENSCRAPER_DEVID }}
-          TAKO_SCREENSCRAPER_DEV_PASSWORD: ${{ secrets.SCREENSCRAPER_DEVPASSWORD }}
-          TAKO_SCREENSCRAPER_SOFT_NAME: ${{ secrets.SCREENSCRAPER_SOFTNAME }}
-        run: build/rust/package.sh "${{ matrix.target }}" "${{ needs.resolve.outputs.version }}"
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: Tako-${{ needs.resolve.outputs.version }}-${{ matrix.target }}
-          path: dist/Tako-*
-          if-no-files-found: error
-
   publish:
-    needs: [resolve, windows, unix]
+    needs: [resolve, windows]
     if: needs.resolve.outputs.publish == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -255,11 +216,6 @@ jobs:
           describe() {
             case "$1" in
               Tako-Setup-*.exe) echo 'installs the app for your user (no admin), with a Start menu shortcut and an optional desktop shortcut.' ;;
-              *.deb) echo 'package for Debian, Ubuntu and derivatives (`sudo apt install ./file.deb`).' ;;
-              *.AppImage) echo 'runs on most Linux distributions without installing (`chmod +x`, then open it).' ;;
-              *.tar.gz) echo 'portable folder, to extract anywhere (data stays in `Tako_Data`).' ;;
-              *.dmg) echo 'drag Tako to Applications.' ;;
-              Tako-macOS-*.zip) echo 'the app bundle, zipped (used by the in-app updater).' ;;
             esac
           }
           # shellcheck disable=SC2086 # $2 é uma lista de globs, expandida de propósito.
@@ -279,8 +235,6 @@ jobs:
             # Desde a 0.2.0-alpha.23 (interface web com o CEF, uma pasta de ~450 MB) não há mais o portátil.
             # shellcheck disable=SC2016 # crases literais (Markdown).
             echo 'No portable `.exe` for Windows anymore: install with `Tako-Setup-x64.exe`. To keep the library of a portable copy, close it and copy the contents of its `Tako_Data` folder to `%LOCALAPPDATA%\Tako` before the first start of the installed version.'; echo
-            section "Linux (x64 = Intel/AMD, arm64 = ARM)" "Tako-Linux-*"
-            section "macOS (arm64 = Apple Silicon, x64 = Intel)" "Tako-macOS-*"
             echo "---"; echo
             printf '%s\n' "${notes##*$'\n---\n\n'}"
           } > release-notes.md
