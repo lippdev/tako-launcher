@@ -6655,6 +6655,7 @@ dependencies = [
  "serde",
  "serde_json",
  "slint",
+ "tako-app",
  "tako-core",
  "tako-platform",
  "tako-sources",

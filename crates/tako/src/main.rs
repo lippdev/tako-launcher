@@ -307,6 +307,11 @@ fn main() {
         }
         return;
     }
+    // Ferramenta de desenvolvimento da interface web: antes da escolha de interface, que a mandaria para a web.
+    if all.get(1).map(String::as_str) == Some(DEV_SNAPSHOT) {
+        tako_platform::attach_parent_console();
+        std::process::exit(dev_snapshot(&all[2..]));
+    }
     if interface(&all, cfg!(all(windows, feature = "web"))) == Interface::Web {
         match run_web(&all) {
             WebEnd::Done => return,
@@ -499,6 +504,52 @@ fn main() {
 }
 
 /// `tako theme check <caminho>`: 0 = tema válido, 1 = problemas (listados), 2 = uso errado.
+/// `tako dev-snapshot [--data-dir <pasta>] [--out <pasta>]` (WEB-DEV-01): grava a biblioteca real em `web/dev-data/`
+/// para o `npm run dev` mostrar os jogos de verdade. Só lê a pasta de dados; não abre janela nem núcleo web.
+const DEV_SNAPSHOT: &str = "dev-snapshot";
+
+fn dev_snapshot(args: &[String]) -> i32 {
+    let _ = tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
+        .with_max_level(tracing::Level::WARN)
+        .try_init();
+    let known = |a: &String| a == "--data-dir" || a == "--out";
+    if !args.len().is_multiple_of(2) || !args.iter().step_by(2).all(known) {
+        eprintln!("uso: tako dev-snapshot [--data-dir <pasta>] [--out <pasta>]");
+        return 2;
+    }
+    let source =
+        value(args, "--data-dir").map_or_else(tako_app::dev_snapshot::default_paths, DataPaths::at);
+    let out = value(args, "--out").map_or_else(default_dev_data, std::path::PathBuf::from);
+    match tako_app::dev_snapshot::write(&source, &out, tako_ui::version()) {
+        Ok(report) => {
+            println!(
+                "{} jogos e {} imagens de {} gravados em {}",
+                report.games,
+                report.images,
+                report.source.display(),
+                report.out.display()
+            );
+            0
+        }
+        Err(e) => {
+            eprintln!("tako dev-snapshot: {e}");
+            1
+        }
+    }
+}
+
+/// `web/dev-data/` do repositório em que o binário foi compilado; fora dele, relativo à pasta atual.
+fn default_dev_data() -> std::path::PathBuf {
+    let web = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(2)
+        .map(|repo| repo.join("web"))
+        .filter(|web| web.join("package.json").is_file())
+        .unwrap_or_else(|| std::path::PathBuf::from("web"));
+    web.join("dev-data")
+}
+
 fn theme_check(args: &[String]) -> i32 {
     use tako_core::i18n::{self, Lang, t, tf};
     i18n::set_lang(Lang::from_env());

@@ -7,6 +7,7 @@ mod art;
 mod control_center;
 mod core;
 mod demo;
+pub mod dev_snapshot;
 mod downloads;
 mod edit;
 mod emulators;
