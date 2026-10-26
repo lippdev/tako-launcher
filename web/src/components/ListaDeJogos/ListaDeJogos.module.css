@@ -77,6 +77,17 @@
   border-color: var(--glass-item-edge);
 }
 
+/* Liquid Glass: a escolhida com o contorno e o reflexo do vidro escolhido; hover a 7%. */
+:global(:root[data-theme="vidro"]) .row:hover {
+  background: var(--vidro-row-hover);
+}
+
+:global(:root[data-theme="vidro"]) .active,
+:global(:root[data-theme="vidro"]) .active:hover {
+  border-color: var(--vidro-selected-edge);
+  box-shadow: var(--vidro-selected-spec);
+}
+
 /* O foco fica na lista; o anel aparece na linha que o teclado escolheu. */
 .viewport:focus-visible .focused {
   outline: var(--focus-ring-width) solid var(--focus-ring);

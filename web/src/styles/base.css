@@ -100,6 +100,20 @@
 
 [data-theme="vidro"] {
   --control-track: #ffffff24;
+  /* Material do Liquid Glass (protótipo, `.tk.theme-glass`): reflexo no topo e sombra embaixo (`--spec`), controles
+     de vidro (branco 10% com contorno 16% e desfoque) e o item escolhido (12%, contorno 14%, reflexo 16%). */
+  --vidro-spec: inset 0 1px 0 #ffffff24, inset 0 -1px 0 #0000002e;
+  --vidro-control-edge: #ffffff29;
+  --vidro-control-hover: #ffffff2b;
+  --vidro-control-blur: blur(var(--glass-blur)) saturate(160%);
+  --vidro-selected-edge: #ffffff24;
+  --vidro-selected-spec: inset 0 1px 0 #ffffff29;
+  --vidro-row-hover: #ffffff12;
+  --vidro-primary: linear-gradient(180deg, #fffffff7, #e4e8f0eb);
+  --vidro-primary-edge: #ffffffe6;
+  --vidro-primary-shadow: inset 0 1px 0 #ffffff, 0 8px 30px #ffffff1f;
+  --vidro-chip-edge: #ffffff26;
+  --vidro-primary-chip: #0d0d0d;
 }
 
 /* Camadas, avisos e controles (WEB-04a): valores do README/protótipo que o `tokens.css` não tem. */
