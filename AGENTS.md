@@ -48,7 +48,7 @@ e a mudança fica em `web/src/**` (`.tsx` de apresentação, `.module.css`), `de
    visual (temas, tipografia, cores, movimento).
 2. **Itere ao vivo.** Quem pede aponta o que mudar; você edita e o Vite recarrega sozinho. Confira com captura
    da tela a 1600×900 (a medida do design) e, quando couber, em 960×600. Não espere uma lista completa: um ponto
-   por vez.
+   por vez. Edite com a ferramenta de edição: no Windows o Vite às vezes não percebe arquivos trocados por `sed -i`.
 3. **Só o que é rápido de conferir:** `npm run typecheck` e `npm run lint` em `web/` antes de commitar.
 4. **Commit direto** na branch em que se está, em Conventional Commits (`style(web): …`, `feat(web): …`).
 5. **O Tako de verdade fica para a release.** O navegador e o CEF são o mesmo Chromium; a conferência no app
