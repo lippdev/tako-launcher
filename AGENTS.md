@@ -3,6 +3,9 @@
 Você está no repositório do **Tako**, um launcher de jogos em Rust que está migrando a interface de Slint para
 React sobre Chromium embutido (CEF). Processo completo: [`docs/processo/multiagente.md`](docs/processo/multiagente.md).
 
+**Pedido de design** (ajustar o visual, montar telas do `design/desktop/Backlog.md`)? Vá direto à §3: trabalha-se
+no navegador, ao vivo, sem tarefa nem bateria de testes.
+
 ## 1. Ordem de verdade
 
 1. O **brief** da sua tarefa.
@@ -33,7 +36,29 @@ Se o brief contradiz o PRD ou o ADR, **pare e diga no relatório**; não escolha
   e afins). Outros agentes rodam builds, testes e servidores em paralelo na mesma máquina. Encerre só pelo PID do
   que você abriu, e use portas próprias (a 5173 é do orquestrador).
 
-## 3. Ambiente (Windows)
+## 3. Trabalho de design (via rápida)
+
+Vale quando o pedido é visual (ajustar ou montar telas, componentes, tokens, itens de `design/desktop/Backlog.md`)
+e a mudança fica em `web/src/**` (`.tsx` de apresentação, `.module.css`), `design/desktop/` ou `locales/`. Aqui
+**não** há brief, tarefa, worktree nem bateria de testes:
+
+1. **Abra no navegador primeiro.** Se nada responde em `http://localhost:5173`, rode `npm run dev` em `web/` (em
+   segundo plano) e mostre a tela a quem pediu (ferramenta de prévia do navegador, se houver; senão, passe o
+   endereço). Rotas: `#/` o app, `#/componentes` a galeria com os estados de cada componente, `#/dev` a base
+   visual (temas, tipografia, cores, movimento).
+2. **Itere ao vivo.** Quem pede aponta o que mudar; você edita e o Vite recarrega sozinho. Confira com captura
+   da tela a 1600×900 (a medida do design) e, quando couber, em 960×600. Não espere uma lista completa: um ponto
+   por vez.
+3. **Só o que é rápido de conferir:** `npm run typecheck` e `npm run lint` em `web/` antes de commitar.
+4. **Commit direto** na branch em que se está, em Conventional Commits (`style(web): …`, `feat(web): …`).
+5. **O Tako de verdade fica para a release.** O navegador e o CEF são o mesmo Chromium; a conferência no app
+   instalado (com a biblioteca real, janela sem moldura, DPI) acontece na bateria de teste da próxima alpha.
+
+As regras de front da §2 continuam valendo (tokens, catálogos `locales/`, só `transform`/`opacity`, Reduzir
+animações). Saiu do visual (ponte, núcleo Rust, dados novos que o hospedeiro falso não tem)? Volte ao processo
+normal: pare, diga o que precisa e siga o [`multiagente.md`](docs/processo/multiagente.md).
+
+## 4. Ambiente (Windows)
 
 - O SDL3 compila com `cmake`, que pode não estar no PATH. Use o do Visual Studio Build Tools:
   `C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin`.
@@ -42,7 +67,7 @@ Se o brief contradiz o PRD ou o ADR, **pare e diga no relatório**; não escolha
   (`cargo build -p <crate>`, `cargo test -p <crate>`).
 - Rust: `cargo fmt --all`, `cargo clippy -p <crate> --all-targets -- -D warnings`, `cargo test -p <crate>`.
 
-## 4. Relatório de entrega
+## 5. Relatório de entrega
 
 Termine com este formato, sem enfeite:
 
