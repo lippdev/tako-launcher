@@ -11,9 +11,28 @@
   scroll-timeline: --pagina-jogo y;
 }
 
-/* A "home" do jogo: o destaque ocupa a vista inteira; o resto vem rolando. */
+/* A "home" do jogo: o destaque e, logo abaixo, a faixa com os números enchem a vista; o resto vem rolando. */
 .heroi {
+  --faixa-altura: 0px;
   scroll-snap-align: start;
+}
+
+/* Faixa: grupo de blocos (6 + 118 + 6, mais os contornos) e 24 embaixo. */
+.comFaixa {
+  --faixa-altura: 156px;
+  --heroi-minimo: 480px;
+}
+
+.faixa {
+  position: relative;
+  z-index: 1;
+  padding: 0 var(--space-40) var(--space-24);
+  transition: opacity 400ms var(--curva-entrada);
+}
+
+.faixa[data-trocando="true"] {
+  opacity: 0;
+  transition-duration: 150ms;
 }
 
 /* Camada de trás: a arte anda mais devagar que a página (sobe a 60% da rolagem) e aproxima um pouco. */
