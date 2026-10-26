@@ -20,8 +20,6 @@
 /* Rolando a página do jogo, o miolo sai antes da arte: sobe e some na primeira metade da vista
    (`--pagina-jogo` vem da PaginaDoJogo; fora dela a animação não tem linha do tempo e fica parada). */
 .pagina .interno {
-  /* Folga de baixo: 46, ou o que a página pedir (`--heroi-folga`) quando põe algo sobre a borda da arte. */
-  padding-bottom: var(--heroi-folga, 46px);
   animation: interno-sai linear both;
   animation-timeline: --pagina-jogo;
   animation-range: 0 55vh;

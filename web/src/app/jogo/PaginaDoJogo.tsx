@@ -357,45 +357,44 @@ export function PaginaDoJogo({ gameId, onMissing }: PaginaDoJogoProps) {
           />
         }
         descricao={blocks.description[0]}
+        dados={<BarraDeDados dados={dataBar} aria-label={t("game_page.data_bar")} />}
+        acoes={
+          <AcoesDoJogo
+            estado={state}
+            favorito={game.favorite}
+            labels={{
+              jogar: t("game_page.play"),
+              abrindo: session.launchSlow ? t("desktop.opening_slow") : t("game_page.opening"),
+              voltarAoJogo: t("game_page.resume"),
+              encerrar: cancellable ? t("common.cancel") : t("game_page.stop"),
+              instalar: t("game_page.install"),
+              emBreve: t("game_page.upcoming"),
+              favoritar: t("game_page.favorite"),
+              desfavoritar: t("game_page.unfavorite"),
+              gerenciar: t("game_page.manage"),
+              configuracoes: t("game_page.settings"),
+            }}
+            onJogar={() => void play()}
+            onVoltarAoJogo={() => {
+              void session.resume();
+            }}
+            onEncerrar={
+              running && (phase !== "launching" || cancellable)
+                ? () => {
+                    void stop();
+                  }
+                : undefined
+            }
+            onAlternarFavorito={() =>
+              void change(() => call("game.favorite.set", { gameIds: [game.id], favorite: !game.favorite }))
+            }
+            onConfiguracoes={() => {
+              setSettingsOpen(true);
+            }}
+            entradasExtras={manageEntries}
+          />
+        }
       />
-      {/* Barra do jogo: os números à esquerda e as ações à direita, sobre a borda de baixo da arte. */}
-      <div className={styles["barra"]} data-parte="" data-trocando={leaving}>
-        {dataBar.length > 0 ? <BarraDeDados dados={dataBar} aria-label={t("game_page.data_bar")} /> : <span />}
-        <AcoesDoJogo
-          estado={state}
-          favorito={game.favorite}
-          labels={{
-            jogar: t("game_page.play"),
-            abrindo: session.launchSlow ? t("desktop.opening_slow") : t("game_page.opening"),
-            voltarAoJogo: t("game_page.resume"),
-            encerrar: cancellable ? t("common.cancel") : t("game_page.stop"),
-            instalar: t("game_page.install"),
-            emBreve: t("game_page.upcoming"),
-            favoritar: t("game_page.favorite"),
-            desfavoritar: t("game_page.unfavorite"),
-            gerenciar: t("game_page.manage"),
-            configuracoes: t("game_page.settings"),
-          }}
-          onJogar={() => void play()}
-          onVoltarAoJogo={() => {
-            void session.resume();
-          }}
-          onEncerrar={
-            running && (phase !== "launching" || cancellable)
-              ? () => {
-                  void stop();
-                }
-              : undefined
-          }
-          onAlternarFavorito={() =>
-            void change(() => call("game.favorite.set", { gameIds: [game.id], favorite: !game.favorite }))
-          }
-          onConfiguracoes={() => {
-            setSettingsOpen(true);
-          }}
-          entradasExtras={manageEntries}
-        />
-      </div>
       {(hasAbout || hasSide) && (
         <div className={styles["corpo"]} data-parte="" data-trocando={leaving}>
           <div className={styles["grade"]}>
