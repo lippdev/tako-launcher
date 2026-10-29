@@ -13,9 +13,9 @@ no navegador, ao vivo, sem tarefa nem bateria de testes.
 3. [`docs/adr/0035-interface-web-rust-e-chromium.md`](docs/adr/0035-interface-web-rust-e-chromium.md) e o
    [plano](docs/plans/2026-10-24-interface-web.md).
 4. [`CONTRIBUTING.md`](CONTRIBUTING.md) (padrões de código Rust, commits, testes).
-5. Visual: [`design/desktop/`](design/desktop/) (README, `tokens.css`, `components/<Nome>/README.md` e
-   `preview.html`). A prévia é o critério de aceite visual a 1600×900. O `Implementacao.md` de lá fala em Slint:
-   vale a regra visual, não o caminho técnico.
+5. Visual: `design/desktop/`, da branch `design-system` (como obter na §3; README, `tokens.css`,
+   `components/<Nome>/README.md` e `preview.html`). A prévia é o critério de aceite visual a 1600×900. O
+   `Implementacao.md` de lá fala em Slint: vale a regra visual, não o caminho técnico.
 
 Se o brief contradiz o PRD ou o ADR, **pare e diga no relatório**; não escolha sozinho.
 
@@ -41,6 +41,22 @@ Se o brief contradiz o PRD ou o ADR, **pare e diga no relatório**; não escolha
 Vale quando o pedido é visual (ajustar ou montar telas, componentes, tokens, itens de `design/desktop/Backlog.md`)
 e a mudança fica em `web/src/**` (`.tsx` de apresentação, `.module.css`), `design/desktop/` ou `locales/`. Aqui
 **não** há brief, tarefa, worktree nem bateria de testes:
+
+### Onde fica o design system
+
+O design system (prévias `preview.html`, `tokens.css`, fontes, ícones, `Backlog.md`, `Implementacao.md` e o
+protótipo) vive **só na branch `design-system`**. A `main` e a `develop` não têm a pasta `design/`, e ela está no
+`.gitignore`: nunca a commite de volta nelas.
+
+- **Obter:** na raiz do repositório, `git fetch origin design-system` e `git worktree add design design-system`.
+  Com isso, todo caminho `design/desktop/…` citado aqui e no código volta a existir.
+- **Mudar o design system:** edite e commite **dentro de `design/`** (é a worktree da branch `design-system`) e dê
+  push nela. Na raiz do repositório, `git status` não mostra esses arquivos.
+- **Levar para o app:** mudou tokens, fontes, marca ou ícones? Rode `npm run sync:design` em `web/` e commite a
+  cópia gerada em `web/src/` na branch do app. O build usa só essa cópia, nunca `design/`.
+- No `npm run dev`, salvar `design/desktop/tokens.css` já atualiza `web/src/styles/tokens.css` sozinho.
+
+### Passo a passo
 
 1. **Abra no navegador primeiro.** Se nada responde em `http://localhost:5173`, rode `npm run dev` em `web/` (em
    segundo plano) e mostre a tela a quem pediu (ferramenta de prévia do navegador, se houver; senão, passe o
