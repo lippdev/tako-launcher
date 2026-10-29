@@ -13,7 +13,8 @@ no navegador, ao vivo, sem tarefa nem bateria de testes.
 3. [`docs/adr/0035-interface-web-rust-e-chromium.md`](docs/adr/0035-interface-web-rust-e-chromium.md) e o
    [plano](docs/plans/2026-10-24-interface-web.md).
 4. [`CONTRIBUTING.md`](CONTRIBUTING.md) (padrões de código Rust, commits, testes).
-5. Visual: [`design/desktop/`](design/desktop/) (README, `tokens.css`, `components/<Nome>/README.md` e
+5. Visual: `design/desktop/`, que vive na branch `design-system` (checkout como worktree em `design/`:
+   `git worktree add design design-system`; README, `tokens.css`, `components/<Nome>/README.md` e
    `preview.html`). A prévia é o critério de aceite visual a 1600×900. O `Implementacao.md` de lá fala em Slint:
    vale a regra visual, não o caminho técnico.
 
@@ -42,9 +43,10 @@ Vale quando o pedido é visual (ajustar ou montar telas, componentes, tokens, it
 e a mudança fica em `web/src/**` (`.tsx` de apresentação, `.module.css`), `design/desktop/` ou `locales/`. Aqui
 **não** há brief, tarefa, worktree nem bateria de testes:
 
-1. **Abra no navegador primeiro.** Se nada responde em `http://localhost:5173`, rode `npm run dev` em `web/` (em
-   segundo plano) e mostre a tela a quem pediu (ferramenta de prévia do navegador, se houver; senão, passe o
-   endereço). Rotas: `#/` o app, `#/componentes` a galeria com os estados de cada componente, `#/dev` a base
+1. **Abra no navegador primeiro.** Sem `design/` na raiz, faça antes `git worktree add design design-system`
+   (mudanças ali são commitadas dentro de `design/`, na branch `design-system`). Se nada responde em
+   `http://localhost:5173`, rode `npm run dev` em `web/` (em segundo plano) e mostre a tela a quem pediu
+   (ferramenta de prévia do navegador, se houver; senão, passe o endereço). Rotas: `#/` o app, `#/componentes` a galeria com os estados de cada componente, `#/dev` a base
    visual (temas, tipografia, cores, movimento).
 2. **Itere ao vivo.** Quem pede aponta o que mudar; você edita e o Vite recarrega sozinho. Confira com captura
    da tela a 1600×900 (a medida do design) e, quando couber, em 960×600. Não espere uma lista completa: um ponto
