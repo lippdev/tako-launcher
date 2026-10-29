@@ -14,8 +14,8 @@ no navegador, ao vivo, sem tarefa nem bateria de testes.
    [plano](docs/plans/2026-10-24-interface-web.md).
 4. [`CONTRIBUTING.md`](CONTRIBUTING.md) (padrões de código Rust, commits, testes).
 5. Visual: `design/desktop/`, da branch `design-system` (como obter na §3; README, `tokens.css`,
-   `components/<Nome>/README.md` e `preview.html`). A prévia é o critério de aceite visual a 1600×900. O `Implementacao.md` de lá fala em Slint:
-   vale a regra visual, não o caminho técnico.
+   `components/<Nome>/README.md` e `preview.html`). A prévia é o critério de aceite visual a 1600×900. O
+   `Implementacao.md` de lá fala em Slint: vale a regra visual, não o caminho técnico.
 
 Se o brief contradiz o PRD ou o ADR, **pare e diga no relatório**; não escolha sozinho.
 
