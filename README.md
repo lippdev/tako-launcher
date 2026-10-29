@@ -31,11 +31,23 @@ crates/
   tako-ui/                       interface nativa (Slint)
   tako-web/                      hospedeiro web (Chromium/CEF)
 web/                             interface web em React + TypeScript
-design/                          design system e componentes desktop
+design/                          (fora do git) worktree da branch `design-system`, ver abaixo
 build/
   rust/                          scripts de empacotamento (Package-Tako.ps1, package.sh, instaladores)
 packaging/                       arquivos de empacotamento e manifesto FSE
 ```
+
+## Design system
+
+O design system (prévias, tokens, fontes, ícones e o protótipo) vive só na branch `design-system`, fora da `main` e
+da `develop`. Para trabalhar nele junto do código, faça o checkout dela em `design/` (já ignorada pelo git):
+
+```sh
+git fetch origin design-system
+git worktree add design design-system
+```
+
+O build não precisa dela: `web/src/` traz a cópia gerada por `npm run sync:design`.
 
 ## Build
 

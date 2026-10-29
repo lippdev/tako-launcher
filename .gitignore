@@ -17,3 +17,6 @@ Tako_Data/
 
 # Biblioteca real para o `npm run dev` (`tako dev-snapshot`, WEB-DEV-01): dados pessoais, nunca no git.
 web/dev-data/
+
+# Design system: vive na branch `design-system`; faça o checkout dela como worktree aqui (`git worktree add design design-system`).
+/design/

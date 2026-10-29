@@ -1,5 +1,6 @@
 // Copia a base visual de `design/desktop/` (só leitura) para `web/src/`, para o build não depender
-// da pasta de design: tokens, fontes (Poppins e Plus Jakarta Sans), marca e ícones.
+// da pasta de design: tokens, fontes (Poppins e Plus Jakarta Sans), marca e ícones. A pasta `design/` é a worktree
+// da branch `design-system` (`git worktree add design design-system`, na raiz do repositório).
 // Rode `npm run sync:design` quando o design system mudar e commite o resultado. No `npm run dev`, o Vite chama
 // `syncTokens` sozinho a cada gravação de `design/desktop/tokens.css` (scripts/vite-dev.mjs).
 
@@ -52,6 +53,10 @@ export function syncTokens({ copyFonts = true } = {}) {
 }
 
 function syncAll() {
+  if (!existsSync(design)) {
+    console.error("design/desktop/ não existe. Na raiz do repositório: git worktree add design design-system");
+    process.exit(1);
+  }
   mkdirSync(join(web, "src", "assets", "brand"), { recursive: true });
   mkdirSync(join(web, "src", "assets", "icons"), { recursive: true });
 
